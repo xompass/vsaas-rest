@@ -1,0 +1,38 @@
+{
+  "where": {
+    "or": [
+      {
+        "and": [
+          {
+            "id": {
+              "inq": ["test1", "test2"]
+            }
+          },
+          {
+            "name": "test"
+          }
+        ]
+      },
+      {
+        "test": {
+          "like": "testtt",
+          "options": "i"
+        }
+      },
+      {
+        "created": {
+          "gt": "2022-01-01",
+          "lte": "2022-01-02"
+        }
+      }
+    ]
+  },
+  "fields": {
+    "id": true,
+    "requested": false,
+    "name": true
+  },
+  "order": ["name ASC", "id desc"],
+  "limit": 10,
+  "skip": 5
+}

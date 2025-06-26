@@ -1,0 +1,6 @@
+{
+  "where": {
+    "and": [{ "name": "test" }, { "surname": { "eq": "asdasd" } }]
+  },
+  "fields": ["id", "name", "requested"]
+}

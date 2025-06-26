@@ -1,0 +1,16 @@
+{
+  "include": [
+    "projects",
+    "var",
+    {
+      "relation": "assets",
+      "scope": {
+        "fields": ["id", "name"]
+      }
+    },
+    {
+      "relation": "dashboards"
+    },
+    "admins,country"
+  ]
+}
