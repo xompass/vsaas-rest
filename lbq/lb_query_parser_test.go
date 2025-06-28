@@ -2,7 +2,6 @@ package lbq
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"testing"
 )
@@ -28,12 +27,14 @@ func TestParseFilter(t *testing.T) {
 		lbFilter, err := ParseFilter(string(content))
 
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 
-		result, _ := json.MarshalIndent(lbFilter, "", "\t")
+		_, err = json.MarshalIndent(lbFilter, "", "\t")
+		if err != nil {
+			t.Fatal(err.Error())
+		}
 
-		fmt.Println(string(result))
 	}
 }
 

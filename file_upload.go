@@ -3,6 +3,7 @@ package rest
 import (
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"mime/multipart"
 	"os"
@@ -48,8 +49,7 @@ type UploadedFile struct {
 
 // StreamingFileUploadHandler handles file uploads with Fiber's streaming body functionality
 type StreamingFileUploadHandler struct {
-	config       *FileUploadConfig
-	fieldConfigs map[string]*FileFieldConfig
+	config *FileUploadConfig
 }
 
 // NewStreamingFileUploadHandler creates a new streaming file upload handler
@@ -75,6 +75,7 @@ func NewStreamingFileUploadHandler(config *FileUploadConfig) *StreamingFileUploa
 func (h *StreamingFileUploadHandler) ProcessStreamingFileUploads(c *fiber.Ctx) (map[string][]*UploadedFile, error) {
 	// Get content type and boundary
 	contentType := c.Get("Content-Type")
+	log.Println("Content-Type:", contentType)
 	if !strings.HasPrefix(contentType, "multipart/form-data") {
 		return nil, fiber.NewError(fiber.StatusBadRequest, "Content-Type must be multipart/form-data")
 	}
@@ -92,6 +93,8 @@ func (h *StreamingFileUploadHandler) ProcessStreamingFileUploads(c *fiber.Ctx) (
 
 	// Get the request body stream
 	bodyStream := c.Context().RequestBodyStream()
+
+	log.Println("Processing streaming file upload with boundary:", boundary)
 
 	// Create multipart reader with the stream
 	reader := multipart.NewReader(bodyStream, boundary)
@@ -139,7 +142,7 @@ func (h *StreamingFileUploadHandler) ProcessStreamingFileUploads(c *fiber.Ctx) (
 	}
 
 	// Validate field requirements
-	for fieldName, fieldConfig := range h.fieldConfigs {
+	for fieldName, fieldConfig := range h.config.FileFields {
 		files := uploadedFiles[fieldName]
 
 		// Check if required field is missing
@@ -148,11 +151,16 @@ func (h *StreamingFileUploadHandler) ProcessStreamingFileUploads(c *fiber.Ctx) (
 			return nil, fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("Field '%s' is required", fieldName))
 		}
 
+		maxFiles := fieldConfig.MaxFiles
+		if maxFiles == 0 {
+			maxFiles = 1
+		}
+
 		// Check max files limit
-		if fieldConfig.MaxFiles > 0 && len(files) > fieldConfig.MaxFiles {
+		if maxFiles > 0 && len(files) > maxFiles {
 			h.cleanupFiles(uploadedFiles)
 			return nil, fiber.NewError(fiber.StatusBadRequest,
-				fmt.Sprintf("Field '%s' exceeds maximum file limit of %d", fieldName, fieldConfig.MaxFiles))
+				fmt.Sprintf("Field '%s' exceeds maximum file limit of %d", fieldName, maxFiles))
 		}
 	}
 
@@ -169,7 +177,7 @@ func (h *StreamingFileUploadHandler) processStreamingFile(fieldName string, part
 		return nil, fiber.NewError(fiber.StatusBadRequest, "File must have an extension")
 	}
 
-	fieldConfig := h.fieldConfigs[fieldName]
+	fieldConfig := h.config.FileFields[fieldName]
 
 	// Validate file extension
 	if err := h.validateFileExtension(ext, fieldConfig); err != nil {

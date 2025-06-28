@@ -3,6 +3,7 @@ package rest
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"reflect"
 	"strings"
@@ -182,6 +183,10 @@ func (receiver *RestApp) Destroy() error {
 	return nil
 }
 
+func (receiver *RestApp) Test(req *http.Request, timeout ...int) (*http.Response, error) {
+	return receiver.FiberApp.Test(req, timeout...)
+}
+
 func (receiver *RestApp) Start() error {
 	return receiver.FiberApp.Listen(fmt.Sprint(":", receiver.options.Port))
 }
@@ -236,6 +241,9 @@ func (receiver *RestApp) RegisterEndpoint(ep *Endpoint, r ...fiber.Router) {
 		}
 
 		executor(ep.Path, ep.run).Name(name)
+	} else {
+		log.Fatalf("Unsupported HTTP method %s for endpoint %s", ep.Method, ep.Name)
+		return
 	}
 }
 

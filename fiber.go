@@ -27,6 +27,7 @@ func NewFiberApp(cfg ...*fiber.Config) *fiber.App {
 		defaultConfig = mergeConfigs(defaultConfig, *aux)
 	}
 
+	defaultConfig.StreamRequestBody = true // Enable streaming request body by default
 	app := fiber.New(defaultConfig)
 
 	// favicon
