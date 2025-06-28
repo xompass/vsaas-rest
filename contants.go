@@ -81,4 +81,112 @@ const (
 	ActionTypeLogout         ActionType = "logout"
 	ActionTypeResetPassword  ActionType = "reset_password"
 	ActionTypeChangePassword ActionType = "change_password"
+	ActionTypeFileUpload     ActionType = "file_upload"
+)
+
+// FileUpload types and configurations
+type FileExtension string
+
+const (
+	// Image formats
+	FileExtensionJPEG FileExtension = ".jpeg"
+	FileExtensionJPG  FileExtension = ".jpg"
+	FileExtensionPNG  FileExtension = ".png"
+	FileExtensionGIF  FileExtension = ".gif"
+	FileExtensionWEBP FileExtension = ".webp"
+	FileExtensionSVG  FileExtension = ".svg"
+	FileExtensionBMP  FileExtension = ".bmp"
+	FileExtensionTIFF FileExtension = ".tiff"
+
+	// Document formats
+	FileExtensionPDF  FileExtension = ".pdf"
+	FileExtensionDOC  FileExtension = ".doc"
+	FileExtensionDOCX FileExtension = ".docx"
+	FileExtensionXLS  FileExtension = ".xls"
+	FileExtensionXLSX FileExtension = ".xlsx"
+	FileExtensionPPT  FileExtension = ".ppt"
+	FileExtensionPPTX FileExtension = ".pptx"
+	FileExtensionTXT  FileExtension = ".txt"
+	FileExtensionRTF  FileExtension = ".rtf"
+	FileExtensionODT  FileExtension = ".odt"
+	FileExtensionODS  FileExtension = ".ods"
+	FileExtensionODP  FileExtension = ".odp"
+
+	// Archive formats
+	FileExtensionZIP FileExtension = ".zip"
+	FileExtensionRAR FileExtension = ".rar"
+	FileExtension7Z  FileExtension = ".7z"
+	FileExtensionTAR FileExtension = ".tar"
+	FileExtensionGZ  FileExtension = ".gz"
+
+	// Video formats
+	FileExtensionMP4  FileExtension = ".mp4"
+	FileExtensionAVI  FileExtension = ".avi"
+	FileExtensionMOV  FileExtension = ".mov"
+	FileExtensionWMV  FileExtension = ".wmv"
+	FileExtensionFLV  FileExtension = ".flv"
+	FileExtensionMKV  FileExtension = ".mkv"
+	FileExtensionWEBM FileExtension = ".webm"
+
+	// Audio formats
+	FileExtensionMP3  FileExtension = ".mp3"
+	FileExtensionWAV  FileExtension = ".wav"
+	FileExtensionFLAC FileExtension = ".flac"
+	FileExtensionAAC  FileExtension = ".aac"
+	FileExtensionOGG  FileExtension = ".ogg"
+	FileExtensionWMA  FileExtension = ".wma"
+
+	// Code formats
+	FileExtensionJS   FileExtension = ".js"
+	FileExtensionTS   FileExtension = ".ts"
+	FileExtensionPY   FileExtension = ".py"
+	FileExtensionGO   FileExtension = ".go"
+	FileExtensionJAVA FileExtension = ".java"
+	FileExtensionC    FileExtension = ".c"
+	FileExtensionCPP  FileExtension = ".cpp"
+	FileExtensionCSS  FileExtension = ".css"
+	FileExtensionHTML FileExtension = ".html"
+	FileExtensionXML  FileExtension = ".xml"
+	FileExtensionJSON FileExtension = ".json"
+	FileExtensionYAML FileExtension = ".yaml"
+	FileExtensionYML  FileExtension = ".yml"
+
+	// Other formats
+	FileExtensionCSV FileExtension = ".csv"
+)
+
+// Predefined file type groups
+var (
+	ImageExtensions = []FileExtension{
+		FileExtensionJPEG, FileExtensionJPG, FileExtensionPNG, FileExtensionGIF,
+		FileExtensionWEBP, FileExtensionSVG, FileExtensionBMP, FileExtensionTIFF,
+	}
+
+	DocumentExtensions = []FileExtension{
+		FileExtensionPDF, FileExtensionDOC, FileExtensionDOCX, FileExtensionXLS,
+		FileExtensionXLSX, FileExtensionPPT, FileExtensionPPTX, FileExtensionTXT,
+		FileExtensionRTF, FileExtensionODT, FileExtensionODS, FileExtensionODP,
+	}
+
+	ArchiveExtensions = []FileExtension{
+		FileExtensionZIP, FileExtensionRAR, FileExtension7Z,
+		FileExtensionTAR, FileExtensionGZ,
+	}
+
+	VideoExtensions = []FileExtension{
+		FileExtensionMP4, FileExtensionAVI, FileExtensionMOV, FileExtensionWMV,
+		FileExtensionFLV, FileExtensionMKV, FileExtensionWEBM,
+	}
+
+	AudioExtensions = []FileExtension{
+		FileExtensionMP3, FileExtensionWAV, FileExtensionFLAC,
+		FileExtensionAAC, FileExtensionOGG, FileExtensionWMA,
+	}
+
+	CodeExtensions = []FileExtension{
+		FileExtensionJS, FileExtensionTS, FileExtensionPY, FileExtensionGO,
+		FileExtensionJAVA, FileExtensionC, FileExtensionCPP, FileExtensionCSS,
+		FileExtensionHTML, FileExtensionXML, FileExtensionJSON, FileExtensionYAML,
+		FileExtensionYML,
+	}
 )

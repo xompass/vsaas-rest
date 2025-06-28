@@ -30,16 +30,17 @@ type EndpointRole interface {
 }
 
 type EndpointContext struct {
-	App          *RestApp
-	FiberCtx     *fiber.Ctx
-	Endpoint     *Endpoint
-	ParsedBody   any
-	ParsedQuery  map[string]any
-	ParsedPath   map[string]any
-	ParsedHeader map[string]any
-	IpAddress    string
-	Principal    Principal
-	Token        AuthToken
+	App           *RestApp
+	FiberCtx      *fiber.Ctx
+	Endpoint      *Endpoint
+	ParsedBody    any
+	ParsedQuery   map[string]any
+	ParsedPath    map[string]any
+	ParsedHeader  map[string]any
+	UploadedFiles map[string][]*UploadedFile // Added for file uploads
+	IpAddress     string
+	Principal     Principal
+	Token         AuthToken
 }
 
 func (eCtx *EndpointContext) ValidateStruct(v any) error {
@@ -149,6 +150,34 @@ func (ctx *EndpointContext) HTML(response string, statusCode ...uint8) error {
 	return ctx.FiberCtx.Status(status).Type("html").SendString(response)
 }
 
+// GetUploadedFiles returns uploaded files for a specific field name
+func (ctx *EndpointContext) GetUploadedFiles(fieldName string) []*UploadedFile {
+	if ctx.UploadedFiles == nil {
+		return nil
+	}
+	return ctx.UploadedFiles[fieldName]
+}
+
+// GetFirstUploadedFile returns the first uploaded file for a specific field name
+func (ctx *EndpointContext) GetFirstUploadedFile(fieldName string) *UploadedFile {
+	files := ctx.GetUploadedFiles(fieldName)
+	if len(files) > 0 {
+		return files[0]
+	}
+	return nil
+}
+
+// HasUploadedFiles returns true if there are uploaded files for the specified field
+func (ctx *EndpointContext) HasUploadedFiles(fieldName string) bool {
+	files := ctx.GetUploadedFiles(fieldName)
+	return len(files) > 0
+}
+
+// GetAllUploadedFiles returns all uploaded files across all fields
+func (ctx *EndpointContext) GetAllUploadedFiles() map[string][]*UploadedFile {
+	return ctx.UploadedFiles
+}
+
 type Param struct {
 	in        ParamLocation
 	name      string
@@ -214,6 +243,10 @@ type Endpoint struct {
 	Accepts         []Param
 	AuditDisabled   bool           // Disable audit logging for this endpoint
 	MetaData        map[string]any // Additional metadata for the endpoint
+
+	// File upload configuration
+	FileUploadConfig  *FileUploadConfig           // Global file upload settings for this endpoint
+	fileUploadHandler *StreamingFileUploadHandler // Internal file upload handler (legacy)
 }
 
 func (ep *Endpoint) run(c *fiber.Ctx) error {
@@ -231,6 +264,17 @@ func (ep *Endpoint) run(c *fiber.Ctx) error {
 	err := parseBody(ep, ctx)
 	if err != nil {
 		return err
+	}
+
+	uploadedFiles, err := ep.fileUploadHandler.ProcessStreamingFileUploads(c)
+	if err != nil {
+		return err
+	}
+	ctx.UploadedFiles = uploadedFiles
+
+	// Setup cleanup after response if configured
+	if ep.FileUploadConfig != nil && !ep.FileUploadConfig.KeepFilesAfterSend {
+		defer ep.fileUploadHandler.CleanupAfterResponse(uploadedFiles)
 	}
 
 	err = parseAllParams(ep, ctx)

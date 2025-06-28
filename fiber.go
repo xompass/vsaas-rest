@@ -43,6 +43,16 @@ func NewFiberApp(cfg ...*fiber.Config) *fiber.App {
 	return app
 }
 
+// EnableStreamingRequestBody enables streaming request body for file uploads
+// This should be called after creating the RestApp but before registering endpoints
+func (receiver *RestApp) EnableStreamingRequestBody() *RestApp {
+	if receiver.FiberApp != nil && receiver.FiberApp.Server() != nil {
+		receiver.FiberApp.Server().StreamRequestBody = true
+		receiver.Infof("Streaming request body enabled for better file upload performance")
+	}
+	return receiver
+}
+
 func mergeConfigs(defaultConfig, customConfig fiber.Config) fiber.Config {
 	if customConfig.ProxyHeader == "" {
 		customConfig.ProxyHeader = defaultConfig.ProxyHeader

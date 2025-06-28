@@ -208,6 +208,10 @@ func (receiver *RestApp) RegisterEndpoint(ep *Endpoint, r ...fiber.Router) {
 		router = receiver.FiberApp
 	}
 
+	if ep.FileUploadConfig != nil {
+		ep.fileUploadHandler = NewStreamingFileUploadHandler(ep.FileUploadConfig)
+	}
+
 	var executor func(path string, handlers ...fiber.Handler) fiber.Router
 	switch ep.Method {
 	case MethodGET:
