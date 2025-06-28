@@ -3,7 +3,6 @@ package rest
 type Principal interface {
 	GetPrincipalID() string
 	GetPrincipalRole() string
-	HasPrincipalPermission(permission string) bool
 }
 
 type Authorizer func(*EndpointContext) (Principal, AuthToken, error)

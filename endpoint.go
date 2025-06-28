@@ -201,15 +201,15 @@ type Endpoint struct {
 	Method          EndpointMethod
 	Path            string
 	Handler         func(c *EndpointContext) error
-	Disabled        bool
-	BodyParams      func() Validable
+	Disabled        bool             // If true, the endpoint is disabled and will not be registered or accessible.
+	BodyParams      func() Validable // Function that returns a Validable struct for body validation.
 	Scope           string
-	RateLimiter     func(*EndpointContext) RateLimit
-	Public          bool
-	Roles           []EndpointRole
+	RateLimiter     func(*EndpointContext) RateLimit // Function to get rate limit configuration for the endpoint.
+	Public          bool                             // If true, the endpoint is publicly accessible without authentication.
+	Roles           []EndpointRole                   // List of roles that can access this endpoint.
 	AllowedIncludes map[EndpointRole][]string
-	ActionType      string // e.g., "create", "read", "update", "delete"
-	Model           string // The related model or resource, e.g., "User", "Order", etc.
+	ActionType      string // e.g., "create", "read", "update", "delete". Used for logging.
+	Model           string // The related model or resource, e.g., "User", "Order", etc. Used for logging
 	app             *RestApp
 	Accepts         []Param
 	AuditDisabled   bool           // Disable audit logging for this endpoint
