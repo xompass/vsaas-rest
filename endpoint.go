@@ -94,21 +94,21 @@ func (ctx *EndpointContext) RespondAndLog(response any, affectedModelId any, con
 
 	switch contentType {
 	case ResponseTypeJSON:
-		return ctx.FiberCtx.Status(status).JSON(response)
+		return ctx.EchoCtx.JSON(status, response)
 	case ResponseTypeXML:
-		return ctx.FiberCtx.Status(status).XML(response)
+		return ctx.EchoCtx.XML(status, response)
 	case ResponseTypeText:
 		if str, ok := response.(string); ok {
-			return ctx.FiberCtx.Status(status).SendString(str)
+			return ctx.EchoCtx.String(status, str)
 		}
 		return fiber.NewError(fiber.StatusInternalServerError, "text response must be string")
 	case ResponseTypeHTML:
 		if str, ok := response.(string); ok {
-			return ctx.FiberCtx.Status(status).Type("html").SendString(str)
+			return ctx.EchoCtx.HTML(status, str)
 		}
 		return fiber.NewError(fiber.StatusInternalServerError, "html response must be string")
 	case ResponseTypeNoContent:
-		return ctx.FiberCtx.SendStatus(fiber.StatusNoContent)
+		return ctx.EchoCtx.NoContent(status)
 
 	default:
 		return fiber.NewError(fiber.StatusNotAcceptable, "unsupported content type")
@@ -121,7 +121,7 @@ func (ctx *EndpointContext) JSON(response any, statusCode ...uint8) error {
 		status = int(statusCode[0])
 	}
 
-	return ctx.FiberCtx.Status(status).JSON(response)
+	return ctx.EchoCtx.JSON(status, response)
 }
 
 func (ctx *EndpointContext) XML(response any, statusCode ...uint8) error {
@@ -130,7 +130,7 @@ func (ctx *EndpointContext) XML(response any, statusCode ...uint8) error {
 		status = int(statusCode[0])
 	}
 
-	return ctx.FiberCtx.Status(status).XML(response)
+	return ctx.EchoCtx.XML(status, response)
 }
 
 func (ctx *EndpointContext) Text(response string, statusCode ...uint8) error {
@@ -139,7 +139,7 @@ func (ctx *EndpointContext) Text(response string, statusCode ...uint8) error {
 		status = int(statusCode[0])
 	}
 
-	return ctx.FiberCtx.Status(status).SendString(response)
+	return ctx.EchoCtx.String(status, response)
 }
 
 func (ctx *EndpointContext) HTML(response string, statusCode ...uint8) error {
@@ -148,7 +148,7 @@ func (ctx *EndpointContext) HTML(response string, statusCode ...uint8) error {
 		status = int(statusCode[0])
 	}
 
-	return ctx.FiberCtx.Status(status).Type("html").SendString(response)
+	return ctx.EchoCtx.HTML(status, response)
 }
 
 // GetUploadedFiles returns uploaded files for a specific field name
