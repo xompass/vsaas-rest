@@ -9,10 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/etag"
-	"github.com/gofiber/fiber/v2/middleware/helmet"
+	"github.com/labstack/echo/v4"
 	"github.com/redis/go-redis/v9"
 	"github.com/xompass/vsaas-rest/database"
 )
@@ -42,7 +39,6 @@ type RestAppOptions struct {
 	Name              string
 	Port              uint16
 	Datasource        *database.Datasource
-	FiberConfig       *fiber.Config
 	LogLevel          LogLevel
 	EnableRateLimiter bool
 	Authorizer        Authorizer
@@ -50,7 +46,7 @@ type RestAppOptions struct {
 }
 
 type RestApp struct {
-	FiberApp          *fiber.App
+	EchoApp           *echo.Echo
 	Datasource        *database.Datasource
 	redisClient       *redis.Client
 	options           RestAppOptions
@@ -123,10 +119,12 @@ func (receiver *RestApp) Authorize(ctx *EndpointContext) error {
 }
 
 func NewRestApp(appOptions RestAppOptions) *RestApp {
-	f := NewFiberApp(appOptions.FiberConfig)
+	e := NewEchoApp()
 
 	validate := validator.New()
 
+	// Set the validation tag name to "json" to match the JSON struct tags
+	// When an error occurs, the field name will be derived from the JSON tag
 	validate.RegisterTagNameFunc(func(fld reflect.StructField) string {
 		parts := strings.SplitN(fld.Tag.Get("json"), ",", 2)
 		if len(parts) == 0 {
@@ -140,7 +138,7 @@ func NewRestApp(appOptions RestAppOptions) *RestApp {
 	})
 
 	app := &RestApp{
-		FiberApp:          f,
+		EchoApp:           e,
 		Datasource:        appOptions.Datasource,
 		options:           appOptions,
 		ValidatorInstance: validate,
@@ -157,13 +155,6 @@ func NewRestApp(appOptions RestAppOptions) *RestApp {
 	if appOptions.AuditLogConfig != nil {
 		app.auditLogConfig = *appOptions.AuditLogConfig
 	}
-
-	// cors
-	f.Use(cors.New())
-
-	f.Use(etag.New())
-
-	f.Use(helmet.New())
 
 	return app
 }
@@ -184,70 +175,59 @@ func (receiver *RestApp) Destroy() error {
 }
 
 func (receiver *RestApp) Test(req *http.Request, timeout ...int) (*http.Response, error) {
-	return receiver.FiberApp.Test(req, timeout...)
+	return nil, nil
 }
 
 func (receiver *RestApp) Start() error {
-	return receiver.FiberApp.Listen(fmt.Sprint(":", receiver.options.Port))
+	return receiver.EchoApp.Start(fmt.Sprint(":", receiver.options.Port))
 }
 
-func (receiver *RestApp) Group(path string, m ...fiber.Handler) fiber.Router {
-	return receiver.FiberApp.Group(path, m...)
+func (receiver *RestApp) Group(path string, m ...echo.MiddlewareFunc) *echo.Group {
+	g := receiver.EchoApp.Group(path)
+	for _, handler := range m {
+		g.Use(handler)
+	}
+	return g
 }
 
-func (receiver *RestApp) RegisterEndpoint(ep *Endpoint, r ...fiber.Router) {
+func (receiver *RestApp) RegisterEndpoint(ep *Endpoint, r *echo.Group) {
 	if ep == nil {
 		return
 	}
 
-	var router fiber.Router
-
-	if len(r) > 0 {
-		if len(r) > 1 {
-			panic("Only one router can be passed to RegisterEndpoint")
-		}
-		router = r[0]
-	}
-
-	if router == nil {
-		router = receiver.FiberApp
-	}
+	var router *echo.Group
 
 	if ep.FileUploadConfig != nil {
 		ep.fileUploadHandler = NewStreamingFileUploadHandler(ep.FileUploadConfig)
 	}
 
-	var executor func(path string, handlers ...fiber.Handler) fiber.Router
+	var executor func(path string, handler echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
 	switch ep.Method {
 	case MethodGET:
-		executor = router.Get
+		executor = router.GET
 	case MethodHEAD:
-		executor = router.Head
+		executor = router.HEAD
 	case MethodPOST:
-		executor = router.Post
+		executor = router.POST
 	case MethodPUT:
-		executor = router.Put
+		executor = router.PUT
 	case MethodPATCH:
-		executor = router.Patch
+		executor = router.PATCH
 	case MethodDELETE:
-		executor = router.Delete
+		executor = router.DELETE
 	}
 
 	if executor != nil {
 		ep.app = receiver
-		name := ""
-		if ep.Name != "" {
-			name = ep.Name
-		}
 
-		executor(ep.Path, ep.run).Name(name)
+		executor(ep.Path, ep.run)
 	} else {
 		log.Fatalf("Unsupported HTTP method %s for endpoint %s", ep.Method, ep.Name)
 		return
 	}
 }
 
-func (receiver *RestApp) RegisterEndpoints(endpoints []*Endpoint, r fiber.Router) {
+func (receiver *RestApp) RegisterEndpoints(endpoints []*Endpoint, r *echo.Group) {
 	for _, ep := range endpoints {
 		if ep == nil {
 			continue

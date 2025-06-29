@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/labstack/echo/v4"
 	"github.com/xompass/vsaas-rest/database"
 )
 
@@ -31,7 +32,7 @@ type EndpointRole interface {
 
 type EndpointContext struct {
 	App           *RestApp
-	FiberCtx      *fiber.Ctx
+	EchoCtx       echo.Context
 	Endpoint      *Endpoint
 	ParsedBody    any
 	ParsedQuery   map[string]any
@@ -249,16 +250,16 @@ type Endpoint struct {
 	fileUploadHandler *StreamingFileUploadHandler // Internal file upload handler (legacy)
 }
 
-func (ep *Endpoint) run(c *fiber.Ctx) error {
+func (ep *Endpoint) run(c echo.Context) error {
 	if ep.Disabled {
 		return NewErrorResponse(fiber.StatusNotFound, "Endpoint not found")
 	}
 
 	ctx := &EndpointContext{
-		FiberCtx:  c,
+		EchoCtx:   c,
 		Endpoint:  ep,
 		App:       ep.app,
-		IpAddress: c.IP() + "",
+		IpAddress: c.RealIP(),
 	}
 
 	err := parseBody(ep, ctx)

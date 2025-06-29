@@ -29,7 +29,7 @@ func parseBody(e *Endpoint, ec *EndpointContext) error {
 		return nil
 	}
 
-	if err := ec.FiberCtx.BodyParser(form); err != nil {
+	if err := ec.EchoCtx.Bind(form); err != nil {
 		return NewErrorResponse(400, "Invalid body", err.Error())
 	}
 
@@ -87,7 +87,7 @@ func parseAllParams(e *Endpoint, ec *EndpointContext) error {
 }
 
 func parseParam(ctx *EndpointContext, param Param) (any, *ErrorResponse) {
-	if ctx == nil || ctx.FiberCtx == nil {
+	if ctx == nil || ctx.EchoCtx == nil {
 		return nil, NewErrorResponse(400, "Invalid context", "Endpoint context is required to get path parameters")
 	}
 
@@ -95,11 +95,16 @@ func parseParam(ctx *EndpointContext, param Param) (any, *ErrorResponse) {
 
 	switch param.in {
 	case InQuery:
-		raw = ctx.FiberCtx.Query(param.name)
+		raw = ctx.EchoCtx.QueryParam(param.name)
 	case InPath:
-		raw = ctx.FiberCtx.Params(param.name)
+		raw = ctx.EchoCtx.Param(param.name)
 	case InHeader:
-		raw = ctx.FiberCtx.Get(param.name)
+		headers := ctx.EchoCtx.Request().Header[param.name]
+		if len(headers) > 0 {
+			raw = headers[0]
+		} else {
+			raw = ""
+		}
 	}
 
 	if param.required && raw == "" {
