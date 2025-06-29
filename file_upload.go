@@ -75,7 +75,6 @@ func NewStreamingFileUploadHandler(config *FileUploadConfig) *StreamingFileUploa
 func (h *StreamingFileUploadHandler) ProcessStreamingFileUploads(c *fiber.Ctx) (map[string][]*UploadedFile, error) {
 	// Get content type and boundary
 	contentType := c.Get("Content-Type")
-	log.Println("Content-Type:", contentType)
 	if !strings.HasPrefix(contentType, "multipart/form-data") {
 		return nil, fiber.NewError(fiber.StatusBadRequest, "Content-Type must be multipart/form-data")
 	}
@@ -91,13 +90,34 @@ func (h *StreamingFileUploadHandler) ProcessStreamingFileUploads(c *fiber.Ctx) (
 		return nil, fiber.NewError(fiber.StatusBadRequest, "Missing boundary in Content-Type")
 	}
 
-	// Get the request body stream
-	bodyStream := c.Context().RequestBodyStream()
+	var reader *multipart.Reader
 
-	log.Println("Processing streaming file upload with boundary:", boundary)
-
-	// Create multipart reader with the stream
-	reader := multipart.NewReader(bodyStream, boundary)
+	// Check if streaming is enabled and we have a valid stream
+	if c.App().Server().StreamRequestBody {
+		log.Println("Streaming mode enabled for file upload")
+		// Streaming mode: use the request body stream directly
+		bodyStream := c.Context().RequestBodyStream()
+		if bodyStream != nil {
+			reader = multipart.NewReader(bodyStream, boundary)
+		} else {
+			// Fallback to non-streaming if stream is nil
+			log.Println("Warning: Streaming enabled but body stream is nil, falling back to buffered mode")
+			body := c.Body()
+			if len(body) == 0 {
+				return nil, fiber.NewError(fiber.StatusBadRequest, "Empty request body")
+			}
+			bodyReader := strings.NewReader(string(body))
+			reader = multipart.NewReader(bodyReader, boundary)
+		}
+	} else {
+		// Non-streaming mode: get the complete body and create a reader from it
+		body := c.Body()
+		if len(body) == 0 {
+			return nil, fiber.NewError(fiber.StatusBadRequest, "Empty request body")
+		}
+		bodyReader := strings.NewReader(string(body))
+		reader = multipart.NewReader(bodyReader, boundary)
+	}
 
 	uploadedFiles := make(map[string][]*UploadedFile)
 

@@ -8,9 +8,6 @@ import (
 	"github.com/go-errors/errors"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/compress"
-	"github.com/gofiber/fiber/v2/middleware/favicon"
-	"github.com/gofiber/fiber/v2/middleware/recover"
 )
 
 // Este archivo configura y crea una nueva aplicación Fiber con varias características y middlewares.
@@ -27,10 +24,9 @@ func NewFiberApp(cfg ...*fiber.Config) *fiber.App {
 		defaultConfig = mergeConfigs(defaultConfig, *aux)
 	}
 
-	defaultConfig.StreamRequestBody = true // Enable streaming request body by default
 	app := fiber.New(defaultConfig)
 
-	// favicon
+	/* // favicon
 	app.Use(favicon.New())
 
 	// Recover from panics
@@ -39,7 +35,7 @@ func NewFiberApp(cfg ...*fiber.Config) *fiber.App {
 	// Compress responses
 	app.Use(compress.New(compress.Config{
 		Level: compress.LevelDefault,
-	}))
+	})) */
 
 	return app
 }
