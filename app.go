@@ -14,22 +14,6 @@ import (
 	"github.com/xompass/vsaas-rest/database"
 )
 
-type LogLevel uint8
-
-const (
-	LogLevelDebug LogLevel = iota
-	LogLevelInfo
-	LogLevelWarn
-	LogLevelError
-)
-
-var LogLevelLabels = map[LogLevel]string{
-	LogLevelDebug: "DEBUG",
-	LogLevelInfo:  "INFO",
-	LogLevelWarn:  "WARN",
-	LogLevelError: "ERROR",
-}
-
 type AuditLogConfig struct {
 	Enabled bool
 	Handler func(ctx *EndpointContext, response any, affectedModelId any) error
@@ -182,20 +166,20 @@ func (receiver *RestApp) Start() error {
 	return receiver.EchoApp.Start(fmt.Sprint(":", receiver.options.Port))
 }
 
-func (receiver *RestApp) Group(path string, m ...echo.MiddlewareFunc) *echo.Group {
+func (receiver *RestApp) Group(path string, m ...MiddlewareFunc) *RouterGroup {
 	g := receiver.EchoApp.Group(path)
 	for _, handler := range m {
-		g.Use(handler)
+		g.Use(convertMiddleware(handler))
 	}
-	return g
+	return &RouterGroup{echoGroup: g}
 }
 
-func (receiver *RestApp) RegisterEndpoint(ep *Endpoint, r *echo.Group) {
+func (receiver *RestApp) RegisterEndpoint(ep *Endpoint, r *RouterGroup) {
 	if ep == nil {
 		return
 	}
 
-	var router *echo.Group = r
+	var router *echo.Group = r.echoGroup
 
 	if ep.FileUploadConfig != nil {
 		ep.echoFileUploadHandler = NewEchoFileUploadHandler(ep.FileUploadConfig)
@@ -227,11 +211,27 @@ func (receiver *RestApp) RegisterEndpoint(ep *Endpoint, r *echo.Group) {
 	}
 }
 
-func (receiver *RestApp) RegisterEndpoints(endpoints []*Endpoint, r *echo.Group) {
+func (receiver *RestApp) RegisterEndpoints(endpoints []*Endpoint, r *RouterGroup) {
 	for _, ep := range endpoints {
 		if ep == nil {
 			continue
 		}
 		receiver.RegisterEndpoint(ep, r)
+	}
+}
+
+// Group creates a subgroup with the specified path and middleware
+func (rg *RouterGroup) Group(path string, m ...MiddlewareFunc) *RouterGroup {
+	g := rg.echoGroup.Group(path)
+	for _, handler := range m {
+		g.Use(convertMiddleware(handler))
+	}
+	return &RouterGroup{echoGroup: g}
+}
+
+// Use adds middleware to the router group
+func (rg *RouterGroup) Use(m ...MiddlewareFunc) {
+	for _, middleware := range m {
+		rg.echoGroup.Use(convertMiddleware(middleware))
 	}
 }

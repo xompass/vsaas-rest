@@ -84,6 +84,22 @@ const (
 	ActionTypeFileUpload     ActionType = "file_upload"
 )
 
+type LogLevel uint8
+
+const (
+	LogLevelDebug LogLevel = iota
+	LogLevelInfo
+	LogLevelWarn
+	LogLevelError
+)
+
+var LogLevelLabels = map[LogLevel]string{
+	LogLevelDebug: "DEBUG",
+	LogLevelInfo:  "INFO",
+	LogLevelWarn:  "WARN",
+	LogLevelError: "ERROR",
+}
+
 // FileUpload types and configurations
 type FileExtension string
 
