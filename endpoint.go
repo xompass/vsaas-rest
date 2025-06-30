@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"context"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -84,6 +85,7 @@ type Endpoint struct {
 	app             *RestApp
 	Accepts         []Param
 	AuditDisabled   bool           // Disable audit logging for this endpoint
+	Timeout         uint16         // Maximum timeout for the endpoint in seconds
 	MetaData        map[string]any // Additional metadata for the endpoint
 
 	// File upload configuration
@@ -96,8 +98,16 @@ func (ep *Endpoint) run(c echo.Context) error {
 		return NewErrorResponse(404, "Endpoint not found")
 	}
 
+	stdContext := c.Request().Context()
+	if ep.Timeout > 0 {
+		var cancel context.CancelFunc
+		stdContext, cancel = context.WithTimeout(stdContext, time.Duration(ep.Timeout)*time.Second)
+		defer cancel()
+	}
+
 	ctx := &EndpointContext{
 		EchoCtx:   c,
+		context:   stdContext,
 		Endpoint:  ep,
 		App:       ep.app,
 		IpAddress: c.RealIP(),

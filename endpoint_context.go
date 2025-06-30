@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -19,6 +20,11 @@ type EndpointContext struct {
 	IpAddress     string
 	Principal     Principal
 	Token         AuthToken
+	context       context.Context
+}
+
+func (eCtx *EndpointContext) Context() context.Context {
+	return eCtx.context
 }
 
 func (eCtx *EndpointContext) ValidateStruct(v any) error {
