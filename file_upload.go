@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"mime"
 	"mime/multipart"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/labstack/echo/v4"
 )
 
 // FileUploadConfig represents the global file upload configuration
@@ -47,13 +47,13 @@ type UploadedFile struct {
 	TempPath     string `json:"temp_path"`
 }
 
-// StreamingFileUploadHandler handles file uploads with Fiber's streaming body functionality
-type StreamingFileUploadHandler struct {
+// StreamingFileUploadHandler handles file uploads with Echo's multipart capabilities
+type EchoFileUploadHandler struct {
 	config *FileUploadConfig
 }
 
-// NewStreamingFileUploadHandler creates a new streaming file upload handler
-func NewStreamingFileUploadHandler(config *FileUploadConfig) *StreamingFileUploadHandler {
+// NewEchoFileUploadHandler creates a new Echo file upload handler
+func NewEchoFileUploadHandler(config *FileUploadConfig) *EchoFileUploadHandler {
 	if config.TempPath == "" {
 		config.TempPath = os.TempDir()
 	}
@@ -66,57 +66,23 @@ func NewStreamingFileUploadHandler(config *FileUploadConfig) *StreamingFileUploa
 	}
 	os.MkdirAll(config.UploadPath, 0755)
 
-	return &StreamingFileUploadHandler{
+	return &EchoFileUploadHandler{
 		config: config,
 	}
 }
 
-// ProcessStreamingFileUploads processes multipart form data using Fiber's streaming body
-func (h *StreamingFileUploadHandler) ProcessStreamingFileUploads(c *fiber.Ctx) (map[string][]*UploadedFile, error) {
-	// Get content type and boundary
-	contentType := c.Get("Content-Type")
+// ProcessStreamingFileUploads processes multipart form data using Echo's multipart parsing with size limits
+func (h *EchoFileUploadHandler) ProcessStreamingFileUploads(c echo.Context) (map[string][]*UploadedFile, error) {
+	// Get content type and verify it's multipart
+	contentType := c.Request().Header.Get("Content-Type")
 	if !strings.HasPrefix(contentType, "multipart/form-data") {
-		return nil, fiber.NewError(fiber.StatusBadRequest, "Content-Type must be multipart/form-data")
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "Content-Type must be multipart/form-data")
 	}
 
-	// Parse media type to get boundary
-	_, params, err := mime.ParseMediaType(contentType)
+	// Parse the multipart form with custom reader to handle streaming
+	reader, err := c.Request().MultipartReader()
 	if err != nil {
-		return nil, fiber.NewError(fiber.StatusBadRequest, "Failed to parse Content-Type")
-	}
-
-	boundary, ok := params["boundary"]
-	if !ok {
-		return nil, fiber.NewError(fiber.StatusBadRequest, "Missing boundary in Content-Type")
-	}
-
-	var reader *multipart.Reader
-
-	// Check if streaming is enabled and we have a valid stream
-	if c.App().Server().StreamRequestBody {
-		log.Println("Streaming mode enabled for file upload")
-		// Streaming mode: use the request body stream directly
-		bodyStream := c.Context().RequestBodyStream()
-		if bodyStream != nil {
-			reader = multipart.NewReader(bodyStream, boundary)
-		} else {
-			// Fallback to non-streaming if stream is nil
-			log.Println("Warning: Streaming enabled but body stream is nil, falling back to buffered mode")
-			body := c.Body()
-			if len(body) == 0 {
-				return nil, fiber.NewError(fiber.StatusBadRequest, "Empty request body")
-			}
-			bodyReader := strings.NewReader(string(body))
-			reader = multipart.NewReader(bodyReader, boundary)
-		}
-	} else {
-		// Non-streaming mode: get the complete body and create a reader from it
-		body := c.Body()
-		if len(body) == 0 {
-			return nil, fiber.NewError(fiber.StatusBadRequest, "Empty request body")
-		}
-		bodyReader := strings.NewReader(string(body))
-		reader = multipart.NewReader(bodyReader, boundary)
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "Failed to create multipart reader: "+err.Error())
 	}
 
 	uploadedFiles := make(map[string][]*UploadedFile)
@@ -129,7 +95,7 @@ func (h *StreamingFileUploadHandler) ProcessStreamingFileUploads(c *fiber.Ctx) (
 		}
 		if err != nil {
 			h.cleanupFiles(uploadedFiles)
-			return nil, fiber.NewError(fiber.StatusBadRequest, "Failed to read multipart data")
+			return nil, echo.NewHTTPError(http.StatusBadRequest, "Failed to read multipart data: "+err.Error())
 		}
 
 		// Skip non-file parts
@@ -162,13 +128,22 @@ func (h *StreamingFileUploadHandler) ProcessStreamingFileUploads(c *fiber.Ctx) (
 	}
 
 	// Validate field requirements
+	if err := h.validateFieldRequirements(uploadedFiles); err != nil {
+		h.cleanupFiles(uploadedFiles)
+		return nil, err
+	}
+
+	return uploadedFiles, nil
+}
+
+// validateFieldRequirements validates that all required fields are present and limits are respected
+func (h *EchoFileUploadHandler) validateFieldRequirements(uploadedFiles map[string][]*UploadedFile) error {
 	for fieldName, fieldConfig := range h.config.FileFields {
 		files := uploadedFiles[fieldName]
 
 		// Check if required field is missing
 		if fieldConfig.Required && len(files) == 0 {
-			h.cleanupFiles(uploadedFiles)
-			return nil, fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("Field '%s' is required", fieldName))
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Field '%s' is required", fieldName))
 		}
 
 		maxFiles := fieldConfig.MaxFiles
@@ -178,23 +153,21 @@ func (h *StreamingFileUploadHandler) ProcessStreamingFileUploads(c *fiber.Ctx) (
 
 		// Check max files limit
 		if maxFiles > 0 && len(files) > maxFiles {
-			h.cleanupFiles(uploadedFiles)
-			return nil, fiber.NewError(fiber.StatusBadRequest,
+			return echo.NewHTTPError(http.StatusBadRequest,
 				fmt.Sprintf("Field '%s' exceeds maximum file limit of %d", fieldName, maxFiles))
 		}
 	}
-
-	return uploadedFiles, nil
+	return nil
 }
 
 // processStreamingFile processes a single file part with streaming validation
-func (h *StreamingFileUploadHandler) processStreamingFile(fieldName string, part *multipart.Part) (*UploadedFile, error) {
+func (h *EchoFileUploadHandler) processStreamingFile(fieldName string, part *multipart.Part) (*UploadedFile, error) {
 	filename := part.FileName()
 
 	// Get file extension
 	ext := strings.ToLower(filepath.Ext(filename))
 	if ext == "" {
-		return nil, fiber.NewError(fiber.StatusBadRequest, "File must have an extension")
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "File must have an extension")
 	}
 
 	fieldConfig := h.config.FileFields[fieldName]
@@ -216,12 +189,13 @@ func (h *StreamingFileUploadHandler) processStreamingFile(fieldName string, part
 		filePath = filepath.Join(h.config.TempPath, uniqueFilename)
 	} else {
 		filePath = filepath.Join(h.config.UploadPath, uniqueFilename)
+		log.Println("Saving file to:", filePath)
 	}
 
 	// Create the destination file
 	dst, err := os.Create(filePath)
 	if err != nil {
-		return nil, fiber.NewError(fiber.StatusInternalServerError, "Failed to create destination file")
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, "Failed to create destination file: "+err.Error())
 	}
 	defer dst.Close()
 
@@ -238,14 +212,14 @@ func (h *StreamingFileUploadHandler) processStreamingFile(fieldName string, part
 			if maxSize > 0 && totalSize > maxSize {
 				dst.Close()
 				os.Remove(filePath)
-				return nil, fiber.NewError(fiber.StatusRequestEntityTooLarge,
-					fmt.Sprintf("File size exceeds limit of %d bytes for field '%s'", maxSize, fieldName))
+				return nil, echo.NewHTTPError(http.StatusRequestEntityTooLarge,
+					fmt.Sprintf("File size exceeds limit of %d bytes for field '%s' (file type: %s)", maxSize, fieldName, ext))
 			}
 
 			// Write to destination
 			if _, writeErr := dst.Write(buffer[:n]); writeErr != nil {
 				os.Remove(filePath)
-				return nil, fiber.NewError(fiber.StatusInternalServerError, "Failed to write file")
+				return nil, echo.NewHTTPError(http.StatusInternalServerError, "Failed to write file: "+writeErr.Error())
 			}
 		}
 
@@ -254,7 +228,7 @@ func (h *StreamingFileUploadHandler) processStreamingFile(fieldName string, part
 		}
 		if err != nil {
 			os.Remove(filePath)
-			return nil, fiber.NewError(fiber.StatusBadRequest, "Failed to read uploaded file")
+			return nil, echo.NewHTTPError(http.StatusBadRequest, "Failed to read uploaded file: "+err.Error())
 		}
 	}
 
@@ -283,7 +257,7 @@ func (h *StreamingFileUploadHandler) processStreamingFile(fieldName string, part
 }
 
 // validateFileExtension validates if the file extension is allowed
-func (h *StreamingFileUploadHandler) validateFileExtension(ext string, fieldConfig *FileFieldConfig) error {
+func (h *EchoFileUploadHandler) validateFileExtension(ext string, fieldConfig *FileFieldConfig) error {
 	allowedTypes := fieldConfig.AllowedTypes
 
 	// If no restrictions, allow all
@@ -297,37 +271,43 @@ func (h *StreamingFileUploadHandler) validateFileExtension(ext string, fieldConf
 		}
 	}
 
-	return fiber.NewError(fiber.StatusUnsupportedMediaType,
-		fmt.Sprintf("File type '%s' is not allowed", ext))
+	return echo.NewHTTPError(http.StatusUnsupportedMediaType,
+		fmt.Sprintf("File type '%s' is not allowed for field. Allowed types: %v", ext, allowedTypes))
 }
 
 // getMaxFileSize determines the maximum file size for a given extension and field
-func (h *StreamingFileUploadHandler) getMaxFileSize(ext FileExtension, fieldConfig *FileFieldConfig) int64 {
-	// Check field-specific type size limits first
+func (h *EchoFileUploadHandler) getMaxFileSize(ext FileExtension, fieldConfig *FileFieldConfig) int64 {
+	// Priority order (highest to lowest):
+	// 1. Field-specific type size limits
+	// 2. Field-specific max file size
+	// 3. Global type size limits
+	// 4. Global max file size
+
+	// Check field-specific type size limits first (highest priority)
 	if fieldConfig != nil && fieldConfig.TypeSizeLimits != nil {
 		if limit, exists := fieldConfig.TypeSizeLimits[ext]; exists {
 			return limit
 		}
 	}
 
-	// Check global type size limits
+	// Check field-specific max file size (second priority)
+	if fieldConfig != nil && fieldConfig.MaxFileSize > 0 {
+		return fieldConfig.MaxFileSize
+	}
+
+	// Check global type size limits (third priority)
 	if h.config.TypeSizeLimits != nil {
 		if limit, exists := h.config.TypeSizeLimits[ext]; exists {
 			return limit
 		}
 	}
 
-	// Check field-specific max file size
-	if fieldConfig != nil && fieldConfig.MaxFileSize > 0 {
-		return fieldConfig.MaxFileSize
-	}
-
-	// Use global max file size
+	// Use global max file size (lowest priority)
 	return h.config.MaxFileSize
 }
 
 // cleanupFiles removes uploaded files (used for error cleanup)
-func (h *StreamingFileUploadHandler) cleanupFiles(uploadedFiles map[string][]*UploadedFile) {
+func (h *EchoFileUploadHandler) cleanupFiles(uploadedFiles map[string][]*UploadedFile) {
 	for _, files := range uploadedFiles {
 		for _, file := range files {
 			if file.Path != "" {
@@ -338,7 +318,7 @@ func (h *StreamingFileUploadHandler) cleanupFiles(uploadedFiles map[string][]*Up
 }
 
 // CleanupAfterResponse removes temporary files after sending response
-func (h *StreamingFileUploadHandler) CleanupAfterResponse(uploadedFiles map[string][]*UploadedFile) {
+func (h *EchoFileUploadHandler) CleanupAfterResponse(uploadedFiles map[string][]*UploadedFile) {
 	if h.config.KeepFilesAfterSend {
 		return
 	}

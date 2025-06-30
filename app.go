@@ -195,10 +195,10 @@ func (receiver *RestApp) RegisterEndpoint(ep *Endpoint, r *echo.Group) {
 		return
 	}
 
-	var router *echo.Group
+	var router *echo.Group = r
 
 	if ep.FileUploadConfig != nil {
-		ep.fileUploadHandler = NewStreamingFileUploadHandler(ep.FileUploadConfig)
+		ep.echoFileUploadHandler = NewEchoFileUploadHandler(ep.FileUploadConfig)
 	}
 
 	var executor func(path string, handler echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route

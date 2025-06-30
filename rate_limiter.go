@@ -4,8 +4,8 @@ import (
 	"context"
 	"os"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/log"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/gommon/log"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -69,7 +69,7 @@ func checkRateLimit(e *EndpointContext) error {
 
 	if count > int64(rateLimit.Max) {
 		log.Warnf("Rate limit exceeded for %s: %d requests", key, count)
-		return fiber.ErrTooManyRequests
+		return echo.ErrTooManyRequests
 	}
 
 	return nil
