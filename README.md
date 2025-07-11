@@ -10,7 +10,7 @@ Un framework web robusto y completo construido sobre Echo v4 para crear APIs RES
 - 🚦 **Rate Limiting**: Control de velocidad con Redis
 - 📁 **Subida de Archivos**: Manejo streaming de archivos con configuración flexible
 - 🎯 **Validación**: Validación automática de parámetros y cuerpo de requests
-- 🔍 **Filtros Avanzados**: Sistema de consultas MongoDB-style
+- 🔍 **Filtros Avanzados**: Sistema de consultas estilo LoopBack 3
 - 📊 **Logging Estructurado**: Logging con niveles configurables
 - ⏱️ **Timeouts**: Control de timeouts por endpoint
 - 🗃️ **Base de Datos**: Integración nativa con MongoDB
@@ -418,7 +418,7 @@ func InternalOperation(ctx *rest.EndpointContext) error {
 }
 ```
 
-#### Cuándo Usar Cada Método
+### Cuándo Usar Cada Método
 
 **Usar `RespondAndLog`** para:
 
@@ -507,7 +507,9 @@ func UploadAvatar(ctx *rest.EndpointContext) error {
 
 ### Filtros y Consultas
 
-El framework proporciona un sistema avanzado de filtros basado en MongoDB que permite crear consultas complejas tanto programáticamente como a través de query parameters.
+El framework proporciona un sistema avanzado de filtros basado en la sintaxis de **LoopBack 3** (Node.js framework) que permite crear consultas complejas tanto programáticamente como a través de query parameters. Esta sintaxis es familiar para desarrolladores que han trabajado con LoopBack y proporciona una interfaz consistente y poderosa para filtrar datos.
+
+> **Nota**: El sistema de filtros está inspirado en LoopBack 3 de Node.js, no en las queries nativas de MongoDB. Actualmente soporta la mayoría de las funcionalidades de LoopBack 3, con la excepción de los `includes` que podrían implementarse en futuras versiones.
 
 #### Usar FilterBuilder Programáticamente
 
@@ -775,8 +777,8 @@ func GetUserPosts(ctx *rest.EndpointContext) error {
 #### Tipos de Query Parameters Disponibles
 
 ```go
-// Filtros y consultas avanzadas
-rest.NewQueryParam("filter", rest.QueryParamTypeFilter)   // FilterBuilder completo
+// Filtros y consultas avanzadas (sintaxis LoopBack 3)
+rest.NewQueryParam("filter", rest.QueryParamTypeFilter)   // FilterBuilder completo (where, order, limit, skip, fields)
 rest.NewQueryParam("where", rest.QueryParamTypeWhere)     // Solo condiciones WHERE
 
 // Tipos básicos
@@ -972,38 +974,6 @@ type UserRequest struct {
 }
 ```
 
-**Nota**: La validación del body solo se aplica a métodos HTTP que pueden tener body (POST, PUT, PATCH). Para métodos GET, HEAD, DELETE, el campo `BodyParams` es ignorado.
-
-### Roles y Permisos
-
-```go
-// Definir permisos
-type Permission struct {
-    name string
-}
-
-func (p Permission) RoleName() string {
-    return p.name
-}
-
-var (
-    PermListItems   = Permission{"list_items"}
-    PermCreateItem  = Permission{"create_item"}
-    PermUpdateItem  = Permission{"update_item"}
-    PermDeleteItem  = Permission{"delete_item"}
-    PermReadItem    = Permission{"read_item"}
-)
-
-// Usar en endpoints
-{
-    Name:    "GetItems",
-    Method:  rest.MethodGET,
-    Path:    "/items",
-    Handler: GetItems,
-    Roles:   []rest.EndpointRole{PermListItems},
-}
-```
-
 ## Tipos de Parámetros
 
 ### Path Parameters
@@ -1016,7 +986,7 @@ rest.NewPathParam("count", rest.PathParamTypeInt)
 ### Query Parameters
 
 ```go
-rest.NewQueryParam("filter", rest.QueryParamTypeFilter)          // Filtro MongoDB
+rest.NewQueryParam("filter", rest.QueryParamTypeFilter)          // Filtro LoopBack-style
 rest.NewQueryParam("limit", rest.QueryParamTypeInt)              // Entero
 rest.NewQueryParam("search", rest.QueryParamTypeString)          // String
 rest.NewQueryParam("active", rest.QueryParamTypeBool)            // Boolean
@@ -1036,7 +1006,7 @@ El framework ofrece dos enfoques para enviar respuestas: con auditoría automát
 
 ### Respuestas con Auditoría (`RespondAndLog`)
 
-Usar cuando necesites trazabilidad automática de la operación:
+Usar cuando necesite trazabilidad automática de la operación:
 
 ```go
 // JSON (por defecto)
