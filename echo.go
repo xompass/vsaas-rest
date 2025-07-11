@@ -1,7 +1,9 @@
 package rest
 
 import (
+	"log"
 	"net/http"
+	"os"
 
 	"github.com/go-errors/errors"
 	"github.com/karagenc/fj4echo"
@@ -17,9 +19,18 @@ func NewEchoApp() *echo.Echo {
 
 	app.JSONSerializer = fj4echo.New()
 
+	isProduction := os.Getenv("APP_ENV") == "production"
+
 	app.HTTPErrorHandler = func(err error, c echo.Context) {
 		if c.Response().Committed {
 			return
+		}
+
+		// Log the full error internally
+		if e, ok := err.(*errors.Error); ok {
+			log.Printf("Unhandled error: %s\n%s", e.Error(), e.ErrorStack())
+		} else {
+			log.Printf("Unhandled error: %s", err.Error())
 		}
 
 		code := http.StatusInternalServerError
@@ -31,18 +42,27 @@ func NewEchoApp() *echo.Echo {
 		switch e := err.(type) {
 		case *echo.HTTPError:
 			code = e.Code
-			responseError = NewErrorResponse(code, e.Error())
+
+			if e.Message != nil {
+				if str, ok := e.Message.(string); ok {
+					responseError = NewErrorResponse(code, str)
+				} else if msg, ok := e.Message.(error); ok {
+					responseError = NewErrorResponse(code, msg.Error())
+				} else {
+					log.Printf("Unexpected HTTPError: %v", e.Message)
+				}
+			}
 		case *ErrorResponse:
 			responseError = e
 			code = e.Code
-		case *errors.Error:
-			responseError = NewErrorResponse(http.StatusInternalServerError, e.Error(), e.ErrorStack())
-			code = http.StatusInternalServerError
 		default:
-			if err.Error() != "" {
-				responseError.Message = err.Error()
+			if !isProduction {
+				if goErr, ok := e.(*errors.Error); ok {
+					responseError = NewErrorResponse(http.StatusInternalServerError, goErr.Error(), goErr.ErrorStack())
+				} else {
+					responseError = NewErrorResponse(http.StatusInternalServerError, e.Error())
+				}
 			}
-
 		}
 
 		c.JSON(code, responseError)

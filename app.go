@@ -1,8 +1,10 @@
 package rest
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"reflect"
@@ -38,6 +40,7 @@ type RestApp struct {
 	environment       string
 	authorizer        Authorizer
 	auditLogConfig    AuditLogConfig
+	logger            *slog.Logger
 }
 
 func (receiver *RestApp) GetEnvironment() string {
@@ -73,14 +76,22 @@ func (receiver *RestApp) log(level LogLevel, format string, args ...any) {
 		return
 	}
 
-	label, exists := LogLevelLabels[level]
-	if !exists {
-		label = "UNKNOWN"
+	var slogLevel slog.Level
+	switch level {
+	case LogLevelDebug:
+		slogLevel = slog.LevelDebug
+	case LogLevelInfo:
+		slogLevel = slog.LevelInfo
+	case LogLevelWarn:
+		slogLevel = slog.LevelWarn
+	case LogLevelError:
+		slogLevel = slog.LevelError
+	default:
+		slogLevel = slog.LevelInfo
 	}
 
-	args = append([]any{label}, args...)
-
-	log.Printf("[%s] "+format, args...)
+	message := fmt.Sprintf(format, args...)
+	receiver.logger.Log(context.Background(), slogLevel, message)
 }
 
 func (receiver *RestApp) Authorize(ctx *EndpointContext) error {
@@ -126,6 +137,9 @@ func NewRestApp(appOptions RestAppOptions) *RestApp {
 		Datasource:        appOptions.Datasource,
 		options:           appOptions,
 		ValidatorInstance: validate,
+		logger: slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.Level(appOptions.LogLevel),
+		})),
 	}
 
 	if appOptions.Authorizer != nil {

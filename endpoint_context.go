@@ -16,7 +16,7 @@ type EndpointContext struct {
 	ParsedQuery   map[string]any
 	ParsedPath    map[string]any
 	ParsedHeader  map[string]any
-	UploadedFiles map[string][]*UploadedFile // Added for file uploads
+	UploadedFiles map[string][]*UploadedFile
 	IpAddress     string
 	Principal     Principal
 	Token         AuthToken
@@ -35,7 +35,7 @@ func (eCtx *EndpointContext) ValidateStruct(v any) error {
 func (eCtx *EndpointContext) GetFilterParam() (*database.FilterBuilder, error) {
 	if filter, ok := eCtx.ParsedQuery["filter"]; ok {
 		if filter == nil {
-			return nil, nil // No filter provided, return nil
+			return nil, nil
 		}
 		if filterBuilder, ok := filter.(*database.FilterBuilder); ok {
 			return filterBuilder, nil
