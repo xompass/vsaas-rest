@@ -509,7 +509,18 @@ func UploadAvatar(ctx *rest.EndpointContext) error {
 
 El framework proporciona un sistema avanzado de filtros basado en la sintaxis de **LoopBack 3** (Node.js framework) que permite crear consultas complejas tanto programáticamente como a través de query parameters. Esta sintaxis es familiar para desarrolladores que han trabajado con LoopBack y proporciona una interfaz consistente y poderosa para filtrar datos.
 
-> **Nota**: El sistema de filtros está inspirado en LoopBack 3 de Node.js, no en las queries nativas de MongoDB. Actualmente soporta la mayoría de las funcionalidades de LoopBack 3, con la excepción de los `includes` que podrían implementarse en futuras versiones.
+#### Compatibilidad con LoopBack 3
+
+El sistema de filtros de `vsaas-rest` está basado en LoopBack 3, proporcionando una sintaxis familiar y potente:
+
+**Características compatibles:**
+
+- **where**: Filtros de condición con operadores como `gt`, `lt`, `gte`, `lte`, `eq`, `neq`, `in`, `nin`, `like`, `nlike`
+- **order**: Ordenamiento ascendente/descendente por múltiples campos
+- **limit/skip**: Paginación estándar
+- **fields**: Proyección de campos (incluir/excluir)
+
+> Nota: La opción `include` aún no ha sido implementada
 
 #### Usar FilterBuilder Programáticamente
 
