@@ -42,16 +42,12 @@ func NewQueryParam(name string, paramType QueryParamType, required ...bool) Para
 	}
 }
 
-func NewPathParam(name string, paramType PathParamType, required ...bool) Param {
-	requiredValue := false
-	if len(required) > 0 {
-		requiredValue = required[0]
-	}
+func NewPathParam(name string, paramType PathParamType) Param {
 	return Param{
 		in:        InPath,
 		name:      name,
 		paramType: string(paramType),
-		required:  requiredValue,
+		required:  true, // Path parameters are always required
 	}
 }
 
