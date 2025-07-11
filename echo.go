@@ -1,6 +1,9 @@
 package rest
 
 import (
+	"net/http"
+
+	"github.com/go-errors/errors"
 	"github.com/karagenc/fj4echo"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -14,7 +17,7 @@ func NewEchoApp() *echo.Echo {
 
 	app.JSONSerializer = fj4echo.New()
 
-	/* app.HTTPErrorHandler = func(err error, c echo.Context) {
+	app.HTTPErrorHandler = func(err error, c echo.Context) {
 		if c.Response().Committed {
 			return
 		}
@@ -43,7 +46,7 @@ func NewEchoApp() *echo.Echo {
 		}
 
 		c.JSON(code, responseError)
-	} */
+	}
 
 	return app
 }
