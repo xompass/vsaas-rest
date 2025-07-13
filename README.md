@@ -4,15 +4,15 @@ Un framework web robusto y completo construido sobre Echo v4 para crear APIs RES
 
 ## Características Principales
 
-- **Basado en Echo v4**
-- **Base de Datos**:
-- **Autenticación y Autorización**
-- **Auditoría**
-- **Rate Limiting**
-- **Subida de Archivos**
-- **Validación**
-- **Filtros Avanzados**
-- **Timeouts**
+- **Basado en Echo v4**: Framework web robusto y de alto rendimiento
+- **Base de Datos**: Soporte para MongoDB con sistema de conectores extensible
+- **Autenticación y Autorización**: Sistema de roles y permisos con autenticador personalizable
+- **Auditoría**: Sistema de logging automático de operaciones con handler personalizable
+- **Rate Limiting**: Control de velocidad de requests con soporte para Redis
+- **Subida de Archivos**: Manejo avanzado de archivos con validación y configuración flexible
+- **Validación**: Validación automática de requests usando go-playground/validator
+- **Filtros Avanzados**: Sistema de filtros basado en sintaxis LoopBack 3 para consultas complejas
+- **Timeouts**: Control de tiempo límite por endpoint para evitar operaciones largas
 
 ## Instalación
 
@@ -54,7 +54,7 @@ func main() {
     app.RegisterEndpoint(endpoint, api)
 
     // Iniciar servidor
-    err = app.Start()
+    err := app.Start()
     if err != nil {
         panic(err)
     }
@@ -304,7 +304,7 @@ err = repo.UpdateOne(ctx, filter, UpdateItem{
 updatedItem, err := repo.FindOneAndUpdate(ctx, filter, UpdateItem{
     Name:  "Updated Product",
     Price: 19.99,
-}, nil)
+})
 
 // Actualizar avanzado
 // UpdateOne, UpdateById y FindOneAndUpdate permiten realizar actualizaciones más complejas con operadores de MongoDB
@@ -711,8 +711,8 @@ rest.NewHeaderParam("X-Request-ID", rest.HeaderParamTypeString, false)
 }
 
 func GetUserPosts(ctx *rest.EndpointContext) error {
-    // userId es un parámetro de ruta, ya parseado automáticamente
-    userId := ctx.ParsedPath["userId"].(bson.ObjectID)
+    // id es un parámetro de ruta, ya parseado automáticamente
+    id := ctx.ParsedPath["id"].(bson.ObjectID)
 
     // Construir filtro combinando query param filter con otros parámetros
     filter, err := ctx.GetFilterParam() // o ctx.ParsedQuery["filter"]
@@ -724,9 +724,9 @@ func GetUserPosts(ctx *rest.EndpointContext) error {
         filter = database.NewFilter()
     }
 
-    // Hacer algo con userId y filter
+    // Hacer algo con id y filter
     return ctx.JSON(map[string]any{
-        "userId": userId.Hex(),
+        "id": id.Hex(),
         "filter": filter,
     })
 }
@@ -768,7 +768,7 @@ var endpoint = &rest.Endpoint{
     Method:     rest.MethodPOST,
     Path:       "/products",
     Handler:    CreateProduct,
-    Body:      &CreateProductRequest{},
+    BodyParams: func() rest.Validable { return &CreateProductRequest{} },
 }
 ```
 
@@ -830,12 +830,13 @@ func (t *MyAuthToken) GetExpiresAt() int64 { return t.ExpiresAt }
     Path:    "/users/:id/avatar",
     Handler: UploadAvatar,
     FileUploadConfig: &rest.FileUploadConfig{
-        MaxFileSize:         10 * 1024 * 1024, // 10MB
-        AllowedExtensions:   []string{".jpg", ".png", ".gif"},
-        AllowedMimeTypes:    []string{"image/jpeg", "image/png", "image/gif"},
-        UploadPath:          "./uploads/avatars",
-        KeepFilesAfterSend:  true,
-        GenerateUniqueNames: true,
+        MaxFileSize:        10 * 1024 * 1024, // 10MB
+        TypeSizeLimits:     map[rest.FileExtension]int64{
+            ".jpg": 5 * 1024 * 1024,  // 5MB para JPG
+            ".png": 10 * 1024 * 1024, // 10MB para PNG
+        },
+        UploadPath:         "./uploads/avatars",
+        KeepFilesAfterSend: true,
     },
 }
 
@@ -894,3 +895,50 @@ Los endpoints pueden tener un timeout configurado para evitar que operaciones la
 ## Licencia
 
 Consulta el archivo LICENSE para más detalles.
+
+## Configuración de Logging
+
+El framework utiliza el sistema de logging estructurado de Go (`slog`) con diferentes niveles:
+
+```go
+app := rest.NewRestApp(rest.RestAppOptions{
+    Name:     "Mi API",
+    Port:     3000,
+    LogLevel: rest.LogLevelDebug, // LogLevelDebug, LogLevelInfo, LogLevelWarn, LogLevelError
+})
+```
+
+Los niveles de log disponibles son:
+
+- `LogLevelDebug`: Información detallada para debugging
+- `LogLevelInfo`: Información general del funcionamiento
+- `LogLevelWarn`: Advertencias que no impiden el funcionamiento
+- `LogLevelError`: Errores que requieren atención
+
+## Variables de Entorno
+
+El framework utiliza las siguientes variables de entorno:
+
+### MongoDB
+
+- `MONGO_URI`: URI de conexión a MongoDB (default: `mongodb://localhost:27017`)
+- `MONGO_DATABASE`: Nombre de la base de datos MongoDB (requerida)
+
+### Redis (para Rate Limiting)
+
+- `REDIS_HOST`: Host del servidor Redis (default: `localhost`)
+- `REDIS_PORT`: Puerto del servidor Redis (default: `6379`)
+- `REDIS_PASSWORD`: Contraseña de Redis (opcional)
+
+### Aplicación
+
+- `APP_ENV`: Entorno de la aplicación (default: `development`)
+
+```bash
+# Ejemplo de archivo .env
+MONGO_URI=mongodb://localhost:27017
+MONGO_DATABASE=mi_aplicacion
+REDIS_HOST=localhost
+REDIS_PORT=6379
+APP_ENV=production
+```
