@@ -1,26 +1,26 @@
 # VSAAS REST Framework
 
-Un framework web robusto y completo construido sobre Echo v4 para crear APIs REST en Go, diseñado específicamente para aplicaciones empresariales con características avanzadas de autenticación, autorización, auditoría, limitación de velocidad y manejo de archivos.
+A robust and comprehensive web framework built on Echo v4 for creating REST APIs in Go, specifically designed for enterprise applications with advanced features for authentication, authorization, auditing, rate limiting, and file handling.
 
-## Características Principales
+## Key Features
 
-- **Basado en Echo v4**: Framework web robusto y de alto rendimiento
-- **Base de Datos**: Soporte para MongoDB con sistema de conectores extensible
-- **Autenticación y Autorización**: Sistema de roles y permisos con autenticador personalizable
-- **Auditoría**: Sistema de logging automático de operaciones con handler personalizable
-- **Rate Limiting**: Control de velocidad de requests con soporte para Redis
-- **Subida de Archivos**: Manejo avanzado de archivos con validación y configuración flexible
-- **Validación**: Validación automática de requests usando go-playground/validator
-- **Filtros Avanzados**: Sistema de filtros basado en sintaxis LoopBack 3 para consultas complejas
-- **Timeouts**: Control de tiempo límite por endpoint para evitar operaciones largas
+- **Echo v4 Based**: Robust and high-performance web framework
+- **Database**: MongoDB support with extensible connector system
+- **Authentication and Authorization**: Role and permission system with customizable authenticator
+- **Auditing**: Automatic operation logging system with customizable handler
+- **Rate Limiting**: Request rate control with Redis support
+- **File Upload**: Advanced file handling with validation and flexible configuration
+- **Validation**: Automatic request validation using go-playground/validator
+- **Advanced Filters**: Filter system based on LoopBack 3 syntax for complex queries
+- **Timeouts**: Timeout control per endpoint to prevent long operations
 
-## Instalación
+## Installation
 
 ```bash
 go get github.com/xompass/vsaas-rest
 ```
 
-## Uso Básico
+## Basic Usage
 
 ```go
 package main
@@ -31,7 +31,7 @@ import (
 )
 
 func main() {
-    // Crear aplicación
+    // Create application
     app := rest.NewRestApp(rest.RestAppOptions{
         Name:              "My API",
         Port:              3000,
@@ -47,13 +47,13 @@ func main() {
         },
     }
 
-    // Crear grupo de rutas
+    // Create route group
     api := app.Group("/api")
 
-    // Registrar endpoint
+    // Register endpoint
     app.RegisterEndpoint(endpoint, api)
 
-    // Iniciar servidor
+    // Start server
     err := app.Start()
     if err != nil {
         panic(err)
@@ -61,17 +61,17 @@ func main() {
 }
 ```
 
-## Base de datos, Modelos y Repositorios
+## Database, Models and Repositories
 
-### Datasource y Conectores
+### Datasource and Connectors
 
-El `Datasource` es el componente central que centraliza las conexiones a la base de datos y el registro de modelos. Un Datasource puede tener múltiples conectores para diferentes bases de datos.
+The `Datasource` is the central component that centralizes database connections and model registration. A Datasource can have multiple connectors for different databases.
 
-El `Connector` es responsable de establecer la conexión con la base de datos específica (actualmente solo MongoDB).
+The `Connector` is responsible for establishing the connection to the specific database (currently only MongoDB).
 
-> **Nota**: Actualmente el framework solo soporta MongoDB como base de datos. El soporte para otros motores de base de datos **podría** implementarse en futuras versiones de ser necesario.
+> **Note**: Currently the framework only supports MongoDB as a database. Support for other database engines **might** be implemented in future versions if needed.
 
-#### Configurar Datasource y Conectores
+#### Configure Datasource and Connectors
 
 ```go
 import (
@@ -79,55 +79,55 @@ import (
 )
 
 func main() {
-    // Opción 1: Usar configuración por defecto
-    // Esto usa las variables de entorno:
-    // MONGO_URI: URI de conexión a MongoDB, default: `mongodb://localhost:27017`
-    // MONGO_DATABASE: Nombre de la base de datos. Requerida
-    // El nombre del conector será "mongodb"
+    // Option 1: Use default configuration
+    // This uses environment variables:
+    // MONGO_URI: MongoDB connection URI, default: `mongodb://localhost:27017`
+    // MONGO_DATABASE: Database name. Required
+    // The connector name will be "mongodb"
     mongoConnector, err := database.NewDefaultMongoConnector()
     if err != nil {
         panic(err)
     }
 
-    // Opción 2: Configuración personalizada
+    // Option 2: Custom configuration
     // opts := &database.MongoConnectorOpts{
     //     ClientOptions: *options.Client().ApplyURI("mongodb://localhost:27017"),
     //     Name:          "mongodb",
-    //     Database:      "mi_base_datos",
+    //     Database:      "my_database",
     // }
     // mongoConnector, err := database.NewMongoConnector(opts)
-    // La función `NewMongoConnector` crea el conector y realiza la conexión a la base de datos.
+    // The `NewMongoConnector` function creates the connector and establishes the database connection.
 
-    // Crear datasource y agregar conector
+    // Create datasource and add connector
     datasource := database.Datasource{}
     datasource.AddConnector(mongoConnector)
 
-    // Usar en la aplicación
+    // Use in application
     app := rest.NewRestApp(rest.RestAppOptions{
         Datasource: &datasource,
-        // ... otras opciones
+        // ... other options
     })
 }
 ```
 
-### Modelos
+### Models
 
-#### Interfaz IModel
+#### IModel Interface
 
-La interfaz `IModel` define los métodos que deben implementar todos los modelos. Esto permite al framework manejar operaciones CRUD de manera genérica y flexible.
+The `IModel` interface defines the methods that all models must implement. This allows the framework to handle CRUD operations generically and flexibly.
 
 ```go
 type IModel interface {
-    GetTableName() string     // Nombre de la tabla/colección en la base de datos
-    GetModelName() string     // Nombre único del modelo para el registro
-    GetConnectorName() string // Nombre del conector de base de datos a usar
-    GetId() any              // ID del documento/registro
+    GetTableName() string     // Name of the table/collection in the database
+    GetModelName() string     // Unique model name for registration
+    GetConnectorName() string // Name of the database connector to use
+    GetId() any              // ID of the document/record
 }
 ```
 
-#### Crear un Modelo
+#### Creating a Model
 
-Ejemplo completo de un modelo que implementa `IModel`:
+Complete example of a model that implements `IModel`:
 
 ```go
 package main
@@ -143,60 +143,60 @@ type Product struct {
     Name     string        `json:"name" bson:"name"`
     Price    float64       `json:"price" bson:"price"`
 
-    // Campos automáticos (opcionales)
+    // Automatic fields (optional)
     Created  *time.Time `json:"created,omitempty" bson:"created,omitempty"`
     Modified *time.Time `json:"modified,omitempty" bson:"modified,omitempty"`
     Deleted  *time.Time `json:"deleted,omitempty" bson:"deleted,omitempty"`
 }
 
-// Implementar la interfaz IModel
+// Implement the IModel interface
 func (p Product) GetId() any {
     return p.ID
 }
 
 func (p Product) GetTableName() string {
-    return "products" // Nombre de la colección en MongoDB
+    return "products" // Collection name in MongoDB
 }
 
 func (p Product) GetModelName() string {
-    return "Product" // Nombre único para el registro
+    return "Product" // Unique name for registration
 }
 
 func (p Product) GetConnectorName() string {
-    return "mongodb" // Debe coincidir con el nombre del conector registrado
+    return "mongodb" // Must match the registered connector name
 }
 ```
 
-#### Hooks del Modelo (Opcional)
+#### Model Hooks (Optional)
 
-Puedes implementar hooks para ejecutar lógica antes de operaciones:
+You can implement hooks to execute logic before operations:
 
 ```go
-// Hook antes de crear
+// Hook before creating
 type BeforeCreateHook interface {
     BeforeCreate() error
 }
 
-// Hook antes de actualizar
+// Hook before updating
 type BeforeUpdateHook interface {
     BeforeUpdate() error
 }
 
-// Hook antes de eliminar
+// Hook before deleting
 type BeforeDeleteHook interface {
     BeforeDelete() error
 }
 
-// Ejemplo de implementación
+// Implementation example
 func (p *Product) BeforeCreate() error {
-    // Lógica antes de crear, como establecer valores predeterminados
+    // Logic before creating, such as setting default values
     return nil
 }
 ```
 
-### Repositorios
+### Repositories
 
-#### Crear un Repositorio
+#### Creating a Repository
 
 ```go
 package main
@@ -208,11 +208,11 @@ import (
 type ProductRepository database.Repository[Product]
 
 func NewProductRepository(ds *database.Datasource) (ProductRepository, error) {
-    // Crear repositorio con opciones
+    // Create repository with options
     repository, err := database.NewMongoRepository[Product](ds, database.RepositoryOptions{
-        Created:  true,  // Maneja automáticamente el campo "created"
-        Modified: true,  // Maneja automáticamente el campo "modified"
-        Deleted:  true,  // Habilita soft delete con campo "deleted"
+        Created:  true,  // Automatically handles the "created" field
+        Modified: true,  // Automatically handles the "modified" field
+        Deleted:  true,  // Enables soft delete with "deleted" field
     })
 
     if err != nil {
@@ -223,7 +223,7 @@ func NewProductRepository(ds *database.Datasource) (ProductRepository, error) {
 }
 ```
 
-#### Registrar Repositorios
+#### Registering Repositories
 
 ```go
 package repositories
@@ -234,7 +234,7 @@ import (
 )
 
 func main(){
-    // Crear datasource y conectores
+    // Create datasource and connectors
     datasource := database.Datasource{}
     mongoConnector, err := database.NewDefaultMongoConnector()
     if err != nil {
@@ -244,7 +244,7 @@ func main(){
 
     app := rest.NewRestApp(rest.RestAppOptions{
         Datasource: &datasource,
-        // ... otras opciones
+        // ... other options
     })
 
     _, err= NewProductRepository(&datasource)
@@ -253,100 +253,100 @@ func main(){
         panic(err)
     }
 
-    // Registrar endpoints e iniciar servidor
+    // Register endpoints and start server
 }
 ```
 
-#### Operaciones de Repositorio
+#### Repository Operations
 
-Los repositorios proporcionan una interfaz para realizar operaciones CRUD y consultas sobre los modelos. Aquí hay algunos ejemplos de cómo usar un repositorio:
+Repositories provide an interface for performing CRUD operations and queries on models. Here are some examples of how to use a repository:
 
 ```go
-// Buscar todos los registros
+// Find all records
 products, err := repo.Find(ctx, nil)
 
-// Buscar con filtro
+// Find with filter
 filter := database.NewFilter().WithWhere(database.NewWhere().Gte("price", 100))
 products, err := repo.Find(ctx, filter)
 
-// Buscar uno
+// Find one
 filter = database.NewFilter().WithWhere(database.NewWhere().Eq("name", "Product A"))
 product, err := repo.FindOne(ctx, filter)
 
-// Buscar por ID
+// Find by ID
 product, err := repo.FindById(ctx, productID, nil)
 
-// Crear
+// Create
 newProduct := Product{Name: "Product B", Price: 99.99}
 insertID, err := repo.Insert(ctx, newProduct)
 
-// Crear y retornar el documento creado
+// Create and return the created document
 createdItem, err := repo.Create(ctx, newProduct)
 
 type UpdateItem struct {
     Name  string   `bson:"name"`
-    Price *float64 `bson:"price,omitempty"` // omitempty hace que este campo no se actualice si está vacío
+    Price *float64 `bson:"price,omitempty"` // omitempty makes this field not update if empty
 }
 
-// Actualizar por ID
+// Update by ID
 err = repo.UpdateById(ctx, itemID, UpdateItem{
     Name:  "Updated Name",
 })
 
-// Actualizar uno basico
-// UpdateOne actualiza el primer documento que coincida con el filtro y actualiza solo los campos especificados
+// Basic update one
+// UpdateOne updates the first document that matches the filter and updates only the specified fields
 err = repo.UpdateOne(ctx, filter, UpdateItem{
     Name:  "Updated Product",
 })
 
-// Buscar y actualizar
-// FindOneAndUpdate busca un documento y lo actualiza, retornando el documento actualizado
+// Find and update
+// FindOneAndUpdate finds a document and updates it, returning the updated document
 updatedItem, err := repo.FindOneAndUpdate(ctx, filter, UpdateItem{
     Name:  "Updated Product",
     Price: 19.99,
 })
 
-// Actualizar avanzado
-// UpdateOne, UpdateById y FindOneAndUpdate permiten realizar actualizaciones más complejas con operadores de MongoDB
+// Advanced update
+// UpdateOne, UpdateById and FindOneAndUpdate allow for more complex updates with MongoDB operators
 err = repo.UpdateOne(ctx, filter, bson.M{"$set": bson.M{"name": "Updated Product"}, "$inc": bson.M{"price": 10}})
 
-// Contar documentos
+// Count documents
 count, err := repo.Count(ctx, filter)
 
-// Verificar existencia
+// Check existence
 exists, err := repo.Exists(ctx, itemID)
 
-// Eliminar (soft delete si está habilitado)
+// Delete (soft delete if enabled)
 err = repo.DeleteById(ctx, itemID)
 
-// Eliminar múltiples
+// Delete multiple
 deletedCount, err := repo.DeleteMany(ctx, filter)
 ```
 
-### Filtros y Consultas
+### Filters and Queries
 
-El framework proporciona un sistema avanzado de filtros basado en la sintaxis de **LoopBack 3** (Node.js framework) que permite crear consultas complejas tanto programáticamente como a través de query parameters. Esta sintaxis es familiar para desarrolladores que han trabajado con LoopBack y proporciona una interfaz consistente y poderosa para filtrar datos.
+The framework provides an advanced filter system based on **LoopBack 3** syntax (Node.js framework) that allows creating complex queries both programmatically and through query parameters. This syntax is familiar to developers who have worked with LoopBack and provides a consistent and powerful interface for filtering data.
 
-#### Compatibilidad con LoopBack 3
+#### LoopBack 3 Compatibility
 
-El sistema de filtros de `vsaas-rest` está basado en LoopBack 3, proporcionando una sintaxis familiar y potente:
+The `vsaas-rest` filter system is based on LoopBack 3, providing familiar and powerful syntax:
 
-**Características compatibles:**
+**Compatible features:**
 
-- **where**: Filtros de condición con operadores como `gt`, `lt`, `gte`, `lte`, `eq`, `neq`, `in`, `nin`, `like`, `nlike`
-- **order**: Ordenamiento ascendente/descendente por múltiples campos
-- **limit/skip**: Paginación estándar
-- **fields**: Proyección de campos (incluir/excluir)
+- **where**: Condition filters with operators like `gt`, `lt`, `gte`, `lte`, `eq`, `neq`, `in`, `nin`, `like`, `nlike`
+- **order**: Ascending/descending sorting by multiple fields
+- **limit/skip**: Standard pagination
+- **fields**: Field projection (include/exclude)
 
-> Nota: La opción `include` aún no ha sido implementada
+> Note: The `include` option has not been implemented yet
 
-#### Usar FilterBuilder Programáticamente
+#### Using FilterBuilder Programmatically
 
 ```go
 import "github.com/xompass/vsaas-rest/database"
 
 func GetUsers(ctx *rest.EndpointContext) error {
-    // Crear filtro programáticamente
+    // Create filter programmatically
     filter := database.NewFilter().
         WithWhere(database.NewWhere().
             Eq("isActive", true).
@@ -370,9 +370,9 @@ func GetUsers(ctx *rest.EndpointContext) error {
 }
 ```
 
-#### Usar Filtros desde Query Parameters
+#### Using Filters from Query Parameters
 
-Cuando defines un parámetro de tipo `QueryParamTypeFilter`, el framework automáticamente parsea el JSON y te da un `FilterBuilder`:
+When you define a parameter of type `QueryParamTypeFilter`, the framework automatically parses the JSON and gives you a `FilterBuilder`:
 
 ```go
 {
@@ -388,22 +388,22 @@ Cuando defines un parámetro de tipo `QueryParamTypeFilter`, el framework autom�
 }
 
 func GetUsers(ctx *rest.EndpointContext) error {
-    // El framework ya parseó el filtro del query parameter
+    // The framework already parsed the filter from query parameter
     filter, err := ctx.GetFilterParam()
     if err != nil {
         return err
     }
 
-    // Si no hay filtro, crear uno nuevo
+    // If no filter, create a new one
     if filter == nil {
         filter = database.NewFilter()
     }
 
-    // Obtener otros parámetros parseados
+    // Get other parsed parameters
     if search, ok := ctx.ParsedQuery["search"].(string); ok && search != "" {
-        // Agregar búsqueda por texto al filtro existente
+        // Add text search to existing filter
         filter = filter.WithWhere(database.NewWhere().
-            Like("name", search, "i"), // "i" para case-insensitive
+            Like("name", search, "i"), // "i" for case-insensitive
         )
     }
 
@@ -425,62 +425,62 @@ func GetUsers(ctx *rest.EndpointContext) error {
 }
 ```
 
-#### Ejemplos de Requests con Filtros
+#### Request Examples with Filters
 
 ```bash
-# Filtro básico
+# Basic filter
 GET /api/items?filter={"where":{"isActive":true,"priority":{"gt":1}},"limit":10,"order":"name ASC"}
 
-# Filtro con búsqueda adicional
+# Filter with additional search
 GET /api/items?filter={"where":{"isActive":true}}&search=test&limit=5
 
-# Filtro complejo con múltiples condiciones
+# Complex filter with multiple conditions
 GET /api/items?filter={"where":{"and":[{"priority":{"gte":1}},{"status":"active"}]},"order":"name ASC","limit":20,"skip":40}
 
-# Solo proyección de campos específicos
+# Only specific field projection
 GET /api/items?filter={"fields":{"name":true,"description":true},"limit":10}
 ```
 
-#### API de FilterBuilder
+#### FilterBuilder API
 
-**Métodos de construcción:**
+**Construction methods:**
 
 ```go
 filter := database.NewFilter()
 
-// Condiciones WHERE
+// WHERE conditions
 filter.WithWhere(database.NewWhere().Eq("status", "active"))
 filter.WithWhere(database.NewWhere().Gt("age", 18))
 
-// Ordenamiento
+// Sorting
 filter.OrderByAsc("name")
 filter.OrderByDesc("createdAt")
 
-// Paginación
+// Pagination
 filter.Limit(10)
 filter.Skip(20)
-filter.Page(2, 10) // página 2, 10 elementos por página
+filter.Page(2, 10) // page 2, 10 elements per page
 
-// Proyección de campos
+// Field projection
 filter.Fields(map[string]bool{
     "name":  true,
     "email": true,
-    "_id":   false, // excluir _id
+    "_id":   false, // exclude _id
 })
 ```
 
-#### API de WhereBuilder
+#### WhereBuilder API
 
-**Operadores de comparación:**
+**Comparison operators:**
 
 ```go
 where := database.NewWhere()
 
-// Igualdad
+// Equality
 where.Eq("status", "active")
 where.Neq("status", "inactive")
 
-// Comparación numérica
+// Numeric comparison
 where.Gt("age", 18)
 where.Gte("age", 18)
 where.Lt("age", 65)
@@ -490,33 +490,33 @@ where.Lte("age", 65)
 where.In("category", []string{"tech", "science"})
 where.Nin("status", []string{"deleted", "banned"})
 
-// Rangos
+// Ranges
 where.Between("age", 18, 65, false) // inclusive
 where.Between("score", 80, 100, true) // exclusive
 
-// Búsqueda de texto (regex)
+// Text search (regex)
 where.Like("name", "john", "i") // case-insensitive
 
-// Valores nulos
+// Null values
 where.IsNull("deletedAt")
 where.IsNotNull("email")
 ```
 
-**Operadores lógicos:**
+**Logical operators:**
 
 ```go
-// AND (se combinan automáticamente)
+// AND (automatically combined)
 where := database.NewWhere().
     Eq("isActive", true).
     Gt("age", 18)
 
-// OR explícito
+// Explicit OR
 where := database.NewWhere().Or(
     database.NewWhere().Eq("role", "admin"),
     database.NewWhere().Eq("role", "moderator"),
 )
 
-// Combinaciones complejas
+// Complex combinations
 where := database.NewWhere().
     Eq("isActive", true).
     Or(
@@ -530,7 +530,36 @@ where := database.NewWhere().
 
 ### Endpoints
 
-Para definir endpoints en tu API, puedes usar la estructura `Endpoint` del framework. Cada endpoint define un método HTTP, una ruta, un handler y otros parámetros como roles, tipo de acción y validación.
+To define endpoints in your API, you can use the framework's `Endpoint` structure. Each endpoint defines an HTTP method, a route, a handler, and other parameters like roles, action type, and validation.
+
+### HTTP Methods Available
+
+The framework supports the following HTTP methods:
+
+```go
+rest.MethodGET    // To get resources
+rest.MethodPOST   // To create resources
+rest.MethodPUT    // To update complete resources
+rest.MethodPATCH  // To partially update resources
+rest.MethodDELETE // To delete resources
+rest.MethodHEAD   // To get headers without body
+```
+
+### Available Action Types
+
+For auditing and logging, the framework defines several action types:
+
+```go
+rest.ActionTypeRead           // Read operations
+rest.ActionTypeCreate         // Create operations
+rest.ActionTypeUpdate         // Update operations
+rest.ActionTypeDelete         // Delete operations
+rest.ActionTypeLogin          // Login
+rest.ActionTypeLogout         // Logout
+rest.ActionTypeResetPassword  // Password reset
+rest.ActionTypeChangePassword // Password change
+rest.ActionTypeFileUpload     // File upload
+```
 
 ```go
 package main
@@ -539,7 +568,7 @@ import (
     rest "github.com/xompass/vsaas-rest"
 )
 
-// Definir estructura de request
+// Define request structure
 type CreateProductRequest struct {
     Name        string  `json:"name" validate:"required,min=2,max=100"`
     Price       float64 `json:"price" validate:"required,gte=0"`
@@ -549,7 +578,7 @@ func (r *CreateProductRequest) Validate(ctx *rest.EndpointContext) error {
     return ctx.ValidateStruct(r)
 }
 
-// Definir endpoints
+// Define endpoints
 var myEndpoints = []*rest.Endpoint{
     {
         Name:       "GetAllProducts",
@@ -578,24 +607,24 @@ var myEndpoints = []*rest.Endpoint{
 }
 
 func GetProducts(ctx *rest.EndpointContext) error {
-    filter, err := ctx.GetFilterParam() // Obtener filtro de query params
+    filter, err := ctx.GetFilterParam() // Get filter from query params
     if err != nil {
         return err
     }
 
-    // Obtener repositorio de productos
+    // Get product repository
     repo, err := database.GetDatasourceModelRepository(ctx.App.Datasource, Product{})
     if err != nil {
         return rest.NewErrorResponse(500, "Database error")
     }
 
-    // Consultar datos
+    // Query data
     products, err := repo.Find(ctx.Context(), filter)
     if err != nil {
         return rest.NewErrorResponse(500, "Failed to fetch products")
     }
 
-    // Operación de lectura con auditoría para trazabilidad
+    // Read operation with auditing for traceability
     return ctx.JSON(products)
 }
 
@@ -605,7 +634,6 @@ func CreateProduct(ctx *rest.EndpointContext) error {
     item := Product{
         Name:  req.Name,
         Price: req.Price,
-    }
     }
 
     repo, err := database.GetDatasourceModelRepository(ctx.App.Datasource, Product{})
@@ -618,39 +646,39 @@ func CreateProduct(ctx *rest.EndpointContext) error {
         return rest.NewErrorResponse(500, "Failed to create item")
     }
 
-    // Antes de responder, puedes agregar lógica de auditoría u otra lógica adicional.
-    // Ver Configurar Auditoría
+    // Before responding, you can add auditing logic or other additional logic.
+    // See Configure Auditing
     return ctx.RespondAndLog(result, result.InsertedID, rest.ResponseTypeJSON, 201)
 }
 ```
 
-### Configurar Auditoría
+### Configure Auditing
 
-El framework incluye un sistema de auditoría configurable que te permite registrar automáticamente las operaciones realizadas en tu API.
+The framework includes a configurable auditing system that allows you to automatically log operations performed in your API.
 
 #### AuditLogConfig
 
-La auditoría se configura mediante `AuditLogConfig`:
+Auditing is configured through `AuditLogConfig`:
 
 ```go
 app := rest.NewRestApp(rest.RestAppOptions{
-    // ... otras opciones
+    // ... other options
     AuditLogConfig: &rest.AuditLogConfig{
-        Enabled: true,          // Habilitar auditoría
-        Handler: MyAuditHandler, // Función personalizada para manejar auditoría
+        Enabled: true,          // Enable auditing
+        Handler: MyAuditHandler, // Custom function to handle auditing
     },
 })
 ```
 
-El `Handler` es una función que tú defines para procesar la información de auditoría como consideres conveniente:
+The `Handler` is a function you define to process audit information as you see fit:
 
 ```go
-// Función de auditoría que decide qué hacer con los logs
+// Audit function that decides what to do with logs
 func MyAuditHandler(ctx *rest.EndpointContext, response any, affectedModelId any) error {
     principal := ctx.Principal
-    // Puedes implementar cualquier lógica que necesites que se ejecute antes de responder
+    // You can implement any logic you need to execute before responding
 
-    // Ejemplo de lógica de auditoría:
+    // Example audit logic:
     auditLog := map[string]any{
         "userId":         principal.GetPrincipalID(),
         "userType":       principal.GetPrincipalRole(),
@@ -662,17 +690,17 @@ func MyAuditHandler(ctx *rest.EndpointContext, response any, affectedModelId any
         "timestamp":      time.Now(),
     }
 
-    // Guardar en base datos
-    // Enviar a un sistema externo
-    // Escribir a un archivo de log
-    // Enviar a métricas/monitoring
+    // Save to database
+    // Send to external system
+    // Write to log file
+    // Send to metrics/monitoring
     return nil
 }
 ```
 
-#### Parámetros de Endpoints
+#### Endpoint Parameters
 
-En el endpoint se pueden definir el campo `Accepts` para especificar los parámetros que acepta, incluyendo parámetros de ruta, query y headers. Los parámetros definidos en `Accepts` se parsean automáticamente y están disponibles en el contexto:
+In the endpoint you can define the `Accepts` field to specify the parameters it accepts, including route, query and header parameters. The parameters defined in `Accepts` are automatically parsed and available in the context:
 
 ##### Path Parameters
 
@@ -684,21 +712,21 @@ rest.NewPathParam("count", rest.PathParamTypeInt)
 #### Query Parameters
 
 ```go
-rest.NewQueryParam("filter", rest.QueryParamTypeFilter)          // Filtro LoopBack-style
-rest.NewQueryParam("limit", rest.QueryParamTypeInt)              // Entero
+rest.NewQueryParam("filter", rest.QueryParamTypeFilter)          // LoopBack-style filter
+rest.NewQueryParam("limit", rest.QueryParamTypeInt)              // Integer
 rest.NewQueryParam("search", rest.QueryParamTypeString)          // String
 rest.NewQueryParam("active", rest.QueryParamTypeBool)            // Boolean
-rest.NewQueryParam("date", rest.QueryParamTypeDate)              // Fecha
+rest.NewQueryParam("date", rest.QueryParamTypeDate)              // Date
 ```
 
 #### Header Parameters
 
 ```go
-rest.NewHeaderParam("X-Custom-Header", rest.HeaderParamTypeString, true) // Requerido
+rest.NewHeaderParam("X-Custom-Header", rest.HeaderParamTypeString, true) // Required
 rest.NewHeaderParam("X-Request-ID", rest.HeaderParamTypeString, false)
 ```
 
-#### Acceso a Parámetros Parseados
+#### Access to Parsed Parameters
 
 ```go
 {
@@ -711,11 +739,11 @@ rest.NewHeaderParam("X-Request-ID", rest.HeaderParamTypeString, false)
 }
 
 func GetUserPosts(ctx *rest.EndpointContext) error {
-    // id es un parámetro de ruta, ya parseado automáticamente
+    // id is a route parameter, already parsed automatically
     id := ctx.ParsedPath["id"].(bson.ObjectID)
 
-    // Construir filtro combinando query param filter con otros parámetros
-    filter, err := ctx.GetFilterParam() // o ctx.ParsedQuery["filter"]
+    // Build filter combining query param filter with other parameters
+    filter, err := ctx.GetFilterParam() // or ctx.ParsedQuery["filter"]
     if err != nil {
         return err
     }
@@ -724,7 +752,7 @@ func GetUserPosts(ctx *rest.EndpointContext) error {
         filter = database.NewFilter()
     }
 
-    // Hacer algo con id y filter
+    // Do something with id and filter
     return ctx.JSON(map[string]any{
         "id": id.Hex(),
         "filter": filter,
@@ -732,13 +760,13 @@ func GetUserPosts(ctx *rest.EndpointContext) error {
 }
 ```
 
-#### Validación del Body de Request
+#### Request Body Validation
 
-El framework incluye un sistema de validación del body de las peticiones HTTP utilizando la interfaz `Validable` y el validador `go-playground/validator`.
+The framework includes a request body validation system using the `Validable` interface and the `go-playground/validator` validator.
 
-##### Interfaz Validable
+##### Validable Interface
 
-Todos los structs que se usan como body parameters deben implementar la interfaz `Validable`:
+All structs used as body parameters must implement the `Validable` interface:
 
 ```go
 type Validable interface {
@@ -746,7 +774,7 @@ type Validable interface {
 }
 ```
 
-#### Ejemplo Básico
+#### Basic Example
 
 ```go
 type CreateProductRequest struct {
@@ -759,7 +787,7 @@ func (r *CreateProductRequest) Validate(ctx *rest.EndpointContext) error {
     if err != nil {
         return err
     }
-    // Aquí puedes agregar lógica adicional de validación si es necesario
+    // Here you can add additional validation logic if needed
     return nil
 }
 
@@ -772,22 +800,22 @@ var endpoint = &rest.Endpoint{
 }
 ```
 
-Como utilizar `go-playground/validator` puede ser encontrado en la [documentación oficial](https://pkg.go.dev/github.com/go-playground/validator/v10).
+How to use `go-playground/validator` can be found in the [official documentation](https://pkg.go.dev/github.com/go-playground/validator/v10).
 
-### Autenticación
+### Authentication
 
-El framework permite definir una función autenticadora personalizada que se ejecuta antes de cada endpoint que no sea público. Esta función debe implementar la lógica de autenticación y autorización, devolviendo un `Principal` y un `AuthToken`.
+The framework allows defining a custom authenticator function that runs before each endpoint that is not public. This function must implement authentication and authorization logic, returning a `Principal` and an `AuthToken`.
 
 ```go
-// Ejemplo de función de autorización personalizada
+// Example custom authorization function
 func MyAuthorizer(ctx *rest.EndpointContext) (rest.Principal, rest.AuthToken, error) {
-    // Obtener token del header Authorization
+    // Get token from Authorization header
     token := ctx.EchoCtx.Request().Header.Get("Authorization")
     if token == "" {
         return nil, nil, rest.NewErrorResponse(401, "Authorization header required")
     }
 
-    // Validar token (implementar lógica específica)
+    // Validate token (implement specific logic)
     principal, authToken, err := ValidateToken(token)
     if err != nil {
         return nil, nil, rest.NewErrorResponse(401, "Invalid token")
@@ -796,13 +824,13 @@ func MyAuthorizer(ctx *rest.EndpointContext) (rest.Principal, rest.AuthToken, er
     return principal, authToken, nil
 }
 
-// Implementar interfaces
+// Implement interfaces
 type MyPrincipal struct {
     ID   string
     Role string
 }
 
-// Implementar la interfaz Principal
+// Implement the Principal interface
 func (p *MyPrincipal) GetPrincipalID() string   { return p.ID }
 func (p *MyPrincipal) GetPrincipalRole() string { return p.Role }
 
@@ -813,7 +841,7 @@ type MyAuthToken struct {
     ExpiresAt int64
 }
 
-// Implementar la interfaz AuthToken
+// Implement the AuthToken interface
 func (t *MyAuthToken) IsValid() bool       { return time.Now().Unix() < t.ExpiresAt }
 func (t *MyAuthToken) GetUserId() string   { return t.UserId }
 func (t *MyAuthToken) GetUserType() string { return t.UserType }
@@ -821,7 +849,7 @@ func (t *MyAuthToken) GetToken() string    { return t.Token }
 func (t *MyAuthToken) GetExpiresAt() int64 { return t.ExpiresAt }
 ```
 
-### Subida de Archivos
+### File Upload
 
 ```go
 {
@@ -832,8 +860,8 @@ func (t *MyAuthToken) GetExpiresAt() int64 { return t.ExpiresAt }
     FileUploadConfig: &rest.FileUploadConfig{
         MaxFileSize:        10 * 1024 * 1024, // 10MB
         TypeSizeLimits:     map[rest.FileExtension]int64{
-            ".jpg": 5 * 1024 * 1024,  // 5MB para JPG
-            ".png": 10 * 1024 * 1024, // 10MB para PNG
+            ".jpg": 5 * 1024 * 1024,  // 5MB for JPG
+            ".png": 10 * 1024 * 1024, // 10MB for PNG
         },
         UploadPath:         "./uploads/avatars",
         KeepFilesAfterSend: true,
@@ -848,7 +876,7 @@ func UploadAvatar(ctx *rest.EndpointContext) error {
 
     file := files[0]
 
-    // Procesar archivo...
+    // Process file...
 
     return ctx.RespondAndLog(map[string]string{
         "message": "Avatar uploaded successfully",
@@ -859,7 +887,7 @@ func UploadAvatar(ctx *rest.EndpointContext) error {
 
 ### Rate Limiting
 
-El framework incluye un sistema de limitación de velocidad (rate limiting) que permite controlar la cantidad de solicitudes que un cliente puede hacer en un período determinado. Esto es útil para prevenir abusos y ataques de denegación de servicio. Requiere una conexión a Redis.
+The framework includes a rate limiting system that allows controlling the number of requests a client can make in a given period. This is useful for preventing abuse and denial-of-service attacks. Requires a Redis connection.
 
 ```go
 {
@@ -870,9 +898,9 @@ El framework incluye un sistema de limitación de velocidad (rate limiting) que 
     Public:  true,
     RateLimiter: func(ctx *rest.EndpointContext) rest.RateLimit {
         return rest.RateLimit{
-            Max:    5,                    // 5 intentos
-            Window: 15 * time.Minute,     // cada 15 minutos
-            Key:    ctx.IpAddress,        // por IP
+            Max:    5,                    // 5 attempts
+            Window: 15 * time.Minute,     // every 15 minutes
+            Key:    ctx.IpAddress,        // by IP
         }
     },
 }
@@ -880,7 +908,7 @@ El framework incluye un sistema de limitación de velocidad (rate limiting) que 
 
 ### Timeouts
 
-Los endpoints pueden tener un timeout configurado para evitar que operaciones largas bloqueen el servidor. Esto es especialmente útil para operaciones que pueden tardar mucho tiempo, como procesamiento de archivos o consultas complejas.
+Endpoints can have a configured timeout to prevent long operations from blocking the server. This is especially useful for operations that can take a long time, such as file processing or complex queries.
 
 ```go
 {
@@ -888,57 +916,57 @@ Los endpoints pueden tener un timeout configurado para evitar que operaciones la
     Method:  rest.MethodPOST,
     Path:    "/operations/long",
     Handler: ProcessLongOperation,
-    Timeout: 30, // 30 segundos
+    Timeout: 30, // 30 seconds
 }
 ```
 
-## Licencia
+## Logging Configuration
 
-Consulta el archivo LICENSE para más detalles.
-
-## Configuración de Logging
-
-El framework utiliza el sistema de logging estructurado de Go (`slog`) con diferentes niveles:
+The framework uses Go's structured logging system (`slog`) with different levels:
 
 ```go
 app := rest.NewRestApp(rest.RestAppOptions{
-    Name:     "Mi API",
+    Name:     "My API",
     Port:     3000,
     LogLevel: rest.LogLevelDebug, // LogLevelDebug, LogLevelInfo, LogLevelWarn, LogLevelError
 })
 ```
 
-Los niveles de log disponibles son:
+Available log levels are:
 
-- `LogLevelDebug`: Información detallada para debugging
-- `LogLevelInfo`: Información general del funcionamiento
-- `LogLevelWarn`: Advertencias que no impiden el funcionamiento
-- `LogLevelError`: Errores que requieren atención
+- `LogLevelDebug`: Detailed information for debugging
+- `LogLevelInfo`: General operation information
+- `LogLevelWarn`: Warnings that don't prevent operation
+- `LogLevelError`: Errors that require attention
 
-## Variables de Entorno
+## Environment Variables
 
-El framework utiliza las siguientes variables de entorno:
+The framework uses the following environment variables:
 
 ### MongoDB
 
-- `MONGO_URI`: URI de conexión a MongoDB (default: `mongodb://localhost:27017`)
-- `MONGO_DATABASE`: Nombre de la base de datos MongoDB (requerida)
+- `MONGO_URI`: MongoDB connection URI (default: `mongodb://localhost:27017`)
+- `MONGO_DATABASE`: MongoDB database name (required)
 
-### Redis (para Rate Limiting)
+### Redis (for Rate Limiting)
 
-- `REDIS_HOST`: Host del servidor Redis (default: `localhost`)
-- `REDIS_PORT`: Puerto del servidor Redis (default: `6379`)
-- `REDIS_PASSWORD`: Contraseña de Redis (opcional)
+- `REDIS_HOST`: Redis server host (default: `localhost`)
+- `REDIS_PORT`: Redis server port (default: `6379`)
+- `REDIS_PASSWORD`: Redis password (optional)
 
-### Aplicación
+### Application
 
-- `APP_ENV`: Entorno de la aplicación (default: `development`)
+- `APP_ENV`: Application environment (default: `development`)
 
 ```bash
-# Ejemplo de archivo .env
+# Example .env file
 MONGO_URI=mongodb://localhost:27017
-MONGO_DATABASE=mi_aplicacion
+MONGO_DATABASE=my_application
 REDIS_HOST=localhost
 REDIS_PORT=6379
 APP_ENV=production
 ```
+
+## License
+
+See the LICENSE file for more details.
