@@ -18,6 +18,7 @@ VSAAS REST Framework is a web framework built on Echo v4 for building REST APIs 
 ## Installation
 
 ```bash
+go mod init myapp
 go get github.com/xompass/vsaas-rest
 ```
 
