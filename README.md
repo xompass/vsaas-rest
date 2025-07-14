@@ -1,18 +1,19 @@
 # VSAAS REST Framework
 
-A robust and comprehensive web framework built on Echo v4 for creating REST APIs in Go, specifically designed for enterprise applications with advanced features for authentication, authorization, auditing, rate limiting, and file handling.
+VSAAS REST Framework is a web framework built on Echo v4 for building REST APIs in Go. It includes features for authentication, authorization, auditing, request validation, structured logging, advanced filtering, file uploads, per-endpoint timeouts, and rate limiting.
 
-## Key Features
+## Main Features
 
-- **Echo v4 Based**: Robust and high-performance web framework
-- **Database**: MongoDB support with extensible connector system
-- **Authentication and Authorization**: Role and permission system with customizable authenticator
-- **Auditing**: Automatic operation logging system with customizable handler
-- **Rate Limiting**: Request rate control with Redis support
-- **File Upload**: Advanced file handling with validation and flexible configuration
-- **Validation**: Automatic request validation using go-playground/validator
-- **Advanced Filters**: Filter system based on LoopBack 3 syntax for complex queries
-- **Timeouts**: Timeout control per endpoint to prevent long operations
+- High-performance HTTP server (Echo v4)
+- Extensible database connectors (MongoDB supported)
+- Role-based authentication and authorization
+- Automatic operation auditing
+- Redis-based rate limiting
+- Secure file uploads with validation
+- Request validation with go-playground/validator
+- LoopBack 3-compatible query filters
+- Per-endpoint timeouts
+- Structured logging (slog)
 
 ## Installation
 
@@ -20,7 +21,7 @@ A robust and comprehensive web framework built on Echo v4 for creating REST APIs
 go get github.com/xompass/vsaas-rest
 ```
 
-## Basic Usage
+## Quick Example
 
 ```go
 package main
@@ -61,15 +62,15 @@ func main() {
 }
 ```
 
-## Database, Models and Repositories
+## Database, Datasource, and Models
 
 ### Datasource and Connectors
 
 The `Datasource` is the central component that centralizes database connections and model registration. A Datasource can have multiple connectors for different databases.
 
-The `Connector` is responsible for establishing the connection to the specific database (currently only MongoDB).
+The `Connector` is responsible for establishing the connection to the specific database.
 
-> **Note**: Currently the framework only supports MongoDB as a database. Support for other database engines **might** be implemented in future versions if needed.
+> **Note**: Currently the framework only supports MongoDB as a database engine. Support for other database engines **might** be implemented in future versions if needed.
 
 #### Configure Datasource and Connectors
 
@@ -149,49 +150,13 @@ type Product struct {
     Deleted  *time.Time `json:"deleted,omitempty" bson:"deleted,omitempty"`
 }
 
-// Implement the IModel interface
-func (p Product) GetId() any {
-    return p.ID
-}
+func (p Product) GetId() any               { return p.ID }
+func (p Product) GetTableName() string     { return "products" }
+func (p Product) GetModelName() string     { return "Product" }
+func (p Product) GetConnectorName() string { return "mongodb" }
 
-func (p Product) GetTableName() string {
-    return "products" // Collection name in MongoDB
-}
-
-func (p Product) GetModelName() string {
-    return "Product" // Unique name for registration
-}
-
-func (p Product) GetConnectorName() string {
-    return "mongodb" // Must match the registered connector name
-}
-```
-
-#### Model Hooks (Optional)
-
-You can implement hooks to execute logic before operations:
-
-```go
-// Hook before creating
-type BeforeCreateHook interface {
-    BeforeCreate() error
-}
-
-// Hook before updating
-type BeforeUpdateHook interface {
-    BeforeUpdate() error
-}
-
-// Hook before deleting
-type BeforeDeleteHook interface {
-    BeforeDelete() error
-}
-
-// Implementation example
-func (p *Product) BeforeCreate() error {
-    // Logic before creating, such as setting default values
-    return nil
-}
+// Optional hooks
+func (p *Product) BeforeCreate() error { return nil }
 ```
 
 ### Repositories
@@ -210,8 +175,8 @@ type ProductRepository database.Repository[Product]
 func NewProductRepository(ds *database.Datasource) (ProductRepository, error) {
     // Create repository with options
     repository, err := database.NewMongoRepository[Product](ds, database.RepositoryOptions{
-        Created:  true,  // Automatically handles the "created" field
-        Modified: true,  // Automatically handles the "modified" field
+        Created:  true,  // Automatically adds the "created" field
+        Modified: true,  // Automatically adds the "modified" field
         Deleted:  true,  // Enables soft delete with "deleted" field
     })
 
@@ -850,6 +815,8 @@ func (t *MyAuthToken) GetExpiresAt() int64 { return t.ExpiresAt }
 ```
 
 ### File Upload
+
+The framework supports secure file uploads with validation, size limits, and type restrictions. You can define file upload endpoints with specific configurations.
 
 ```go
 {

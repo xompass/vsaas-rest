@@ -208,21 +208,11 @@ curl -X POST http://localhost:8080/api/v1/upload \
 - Si `KeepFilesAfterSend` es `false`: Los archivos se guardan en `TempPath` y se eliminan después de enviar la respuesta
 - Si `KeepFilesAfterSend` es `true`: Los archivos se guardan en `UploadPath` y persisten
 
-## Migración desde Fiber
-
-Para migrar desde el sistema anterior basado en Fiber:
-
-1. Reemplaza `StreamingFileUploadHandler` por `EchoFileUploadHandler`
-2. Cambia las referencias de `fiber.NewError` por `echo.NewHTTPError`
-3. Actualiza los imports para usar `github.com/labstack/echo/v4`
-4. Los métodos de `EndpointContext` ahora usan `int` en lugar de `uint8` para códigos de estado
-
 ## Consideraciones de Rendimiento
 
 - El sistema usa buffers de 32KB para lectura streaming
 - Los archivos se validan por tamaño antes de escribirse al disco
 - Los archivos temporales se limpian en goroutines separadas para no bloquear la respuesta
-- Echo maneja mejor el streaming de archivos que Fiber/FastHTTP
 
 ## Seguridad
 
