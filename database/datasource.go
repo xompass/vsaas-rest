@@ -21,6 +21,10 @@ type Datasource struct {
 }
 
 func (receiver *Datasource) AddConnector(connector Connector) error {
+	if receiver == nil {
+		return errors.New("datasource is nil")
+	}
+
 	if receiver.connectors == nil {
 		receiver.connectors = make(map[string]Connector)
 	}
@@ -38,6 +42,10 @@ func (receiver *Datasource) Destroy() {
 }
 
 func (receiver *Datasource) RegisterModel(model IModel) error {
+	if receiver == nil {
+		return errors.New("datasource is nil")
+	}
+
 	connectorName := model.GetConnectorName()
 	modelName := model.GetModelName()
 	connector, err := receiver.GetConnector(connectorName)
@@ -63,6 +71,10 @@ func (receiver *Datasource) RegisterModel(model IModel) error {
 }
 
 func (receiver *Datasource) GetModelConnector(model IModel) (Connector, error) {
+	if receiver == nil {
+		return nil, errors.New("datasource is nil")
+	}
+
 	connector, ok := receiver.connectorByModelName[model.GetModelName()]
 	if !ok {
 		return nil, errors.Errorf("the model %s is not registered", model.GetModelName())
@@ -72,12 +84,33 @@ func (receiver *Datasource) GetModelConnector(model IModel) (Connector, error) {
 }
 
 func (receiver *Datasource) GetConnector(name string) (Connector, error) {
+	if receiver == nil {
+		return nil, errors.New("datasource is nil")
+	}
+
 	connector, ok := receiver.connectors[name]
 	if !ok {
 		return nil, errors.Errorf("the connector %s is not registered", name)
 	}
 
 	return connector, nil
+}
+
+func (receiver *Datasource) GetModel(modelName string) (IModel, error) {
+	if receiver == nil {
+		return nil, errors.New("datasource is nil")
+	}
+
+	if receiver.models == nil {
+		return nil, errors.New("no models registered in the datasource")
+	}
+
+	model, ok := receiver.models[modelName]
+	if !ok {
+		return nil, errors.Errorf("the model %s is not registered", modelName)
+	}
+
+	return model, nil
 }
 
 func RegisterDatasourceRepository[T IModel](ds *Datasource, model T, repository Repository[T]) error {
@@ -126,20 +159,11 @@ func RegisterDatasourceRepository[T IModel](ds *Datasource, model T, repository 
 	return nil
 }
 
-func (datasource *Datasource) GetModel(modelName string) (IModel, error) {
-	if datasource.models == nil {
-		return nil, errors.New("no models registered in the datasource")
-	}
-
-	model, ok := datasource.models[modelName]
-	if !ok {
-		return nil, errors.Errorf("the model %s is not registered", modelName)
-	}
-
-	return model, nil
-}
-
 func GetDatasourceModelRepository[T IModel](datasource *Datasource, model T) (Repository[T], error) {
+	if datasource == nil {
+		return nil, errors.New("datasource is nil")
+	}
+
 	repository, ok := datasource.repositories[model.GetModelName()]
 	if !ok {
 		return nil, errors.Errorf("the model %s is not registered", model.GetModelName())
