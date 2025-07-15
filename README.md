@@ -293,6 +293,19 @@ deletedCount, err := repo.DeleteMany(ctx, filter)
 
 The framework provides an advanced filter system based on **LoopBack 3** syntax (Node.js framework) that allows creating complex queries both programmatically and through query parameters. This syntax is familiar to developers who have worked with LoopBack and provides a consistent and powerful interface for filtering data.
 
+#### Field Names in Filters
+
+When constructing filters, the field names used in `where`, `fields`, and `order` must match the names specified in the `json` tags of your model's struct. For example, if your model has a field defined as:
+
+```go
+type Product struct {
+    Name  string `json:"name"`
+    Price float64 `json:"price"`
+}
+```
+
+You should use `"name"` and `"price"` in your filters, not the Go struct field names (`Name`, `Price`).
+
 #### LoopBack 3 Compatibility
 
 The `vsaas-rest` filter system is based on LoopBack 3, providing familiar and powerful syntax:
