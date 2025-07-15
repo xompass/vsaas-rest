@@ -69,7 +69,7 @@ func (ctx *EndpointContext) RespondAndLog(response any, affectedModelId any, con
 		if ctx.Endpoint.app.auditLogConfig.Enabled && ctx.Endpoint.app.auditLogConfig.Handler != nil {
 			err := ctx.Endpoint.app.auditLogConfig.Handler(ctx, response, affectedModelId)
 			if err != nil {
-				ctx.App.Errorf("Failed to log audit:", err)
+				ctx.App.Errorf("Failed to log audit: %v", err)
 			}
 		}
 	}

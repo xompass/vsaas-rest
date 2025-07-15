@@ -45,6 +45,10 @@ func ConflictError(message string, details ...any) *ErrorResponse {
 	return NewErrorResponse(409, message, details...)
 }
 
+func UnprocessableEntityError(message string, details ...any) *ErrorResponse {
+	return NewErrorResponse(422, message, details...)
+}
+
 func TooManyRequestsError(message string, details ...any) *ErrorResponse {
 	return NewErrorResponse(429, message, details...)
 }
