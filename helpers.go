@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/xompass/vsaas-rest/database"
+	"github.com/xompass/vsaas-rest/http_errors"
 	"github.com/xompass/vsaas-rest/lbq"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -30,22 +31,22 @@ func parseBody(e *Endpoint, ec *EndpointContext) error {
 	}
 
 	if err := ec.EchoCtx.Bind(form); err != nil {
-		return NewErrorResponse(400, "Invalid body", err.Error())
+		return http_errors.BadRequestError("Invalid body", fmt.Sprintf("Failed to bind request body: %s", err.Error()))
 	}
 
 	if err := form.Validate(ec); err != nil {
-		var errResponse *ErrorResponse
+		var errResponse *http_errors.ErrorResponse
 		if errors.As(err, &errResponse) {
 			return errResponse // o simplemente return err
 		}
-		return NewErrorResponse(400, "Invalid body", getFriendlyValidationErrors(err))
+		return http_errors.BadRequestError("Invalid body", getFriendlyValidationErrors(err))
 	}
 
 	ec.ParsedBody = form
 	return nil
 }
 
-type ParamErrors []*ErrorResponse
+type ParamErrors []*http_errors.ErrorResponse
 
 func (pe ParamErrors) Error() string {
 	var messages []string
@@ -86,9 +87,9 @@ func parseAllParams(e *Endpoint, ec *EndpointContext) error {
 	return nil
 }
 
-func parseParam(ctx *EndpointContext, param Param) (any, *ErrorResponse) {
+func parseParam(ctx *EndpointContext, param Param) (any, *http_errors.ErrorResponse) {
 	if ctx == nil || ctx.EchoCtx == nil {
-		return nil, NewErrorResponse(400, "Invalid context", "Endpoint context is required to get path parameters")
+		return nil, http_errors.BadRequestError("Invalid context", "Endpoint context is required to get path parameters")
 	}
 
 	var raw string
@@ -108,13 +109,13 @@ func parseParam(ctx *EndpointContext, param Param) (any, *ErrorResponse) {
 	}
 
 	if param.required && raw == "" {
-		return nil, NewErrorResponse(400, "Missing parameter", fmt.Sprintf("Parameter %s is required", param.name))
+		return nil, http_errors.BadRequestError("Missing parameter", fmt.Sprintf("Parameter %s is required", param.name))
 	}
 
 	if param.Parser != nil {
 		val, err := param.Parser(raw)
 		if err != nil {
-			return nil, NewErrorResponse(400, "Invalid parameter", fmt.Sprintf("Parameter %s is invalid: %s", param.name, err.Error()))
+			return nil, http_errors.BadRequestError("Invalid parameter", fmt.Sprintf("Parameter %s is invalid: %s", param.name, err.Error()))
 		}
 
 		return val, nil
@@ -130,45 +131,45 @@ func parseParam(ctx *EndpointContext, param Param) (any, *ErrorResponse) {
 	case string(PathParamTypeInt):
 		value, err := strconv.Atoi(raw)
 		if err != nil {
-			return nil, NewErrorResponse(400, "Invalid parameter", "Parameter "+param.name+" must be an integer")
+			return nil, http_errors.BadRequestError("Invalid parameter", "Parameter "+param.name+" must be an integer")
 		}
 
 		return value, nil
 	case string(PathParamTypeBool):
 		value, err := strconv.ParseBool(raw)
 		if err != nil {
-			return nil, NewErrorResponse(400, "Invalid parameter", "Parameter "+param.name+" must be a boolean")
+			return nil, http_errors.BadRequestError("Invalid parameter", "Parameter "+param.name+" must be a boolean")
 		}
 		return value, nil
 	case string(PathParamTypeFloat):
 		value, err := strconv.ParseFloat(raw, 64)
 		if err != nil {
-			return nil, NewErrorResponse(400, "Invalid parameter", "Parameter "+param.name+" must be a float")
+			return nil, http_errors.BadRequestError("Invalid parameter", "Parameter "+param.name+" must be a float")
 		}
 
 		return value, nil
 	case string(PathParamTypeDate):
 		value, err := time.Parse("2006-01-02", raw)
 		if err != nil {
-			return nil, NewErrorResponse(400, "Invalid parameter", "Parameter "+param.name+" must be a date in the format YYYY-MM-DD")
+			return nil, http_errors.BadRequestError("Invalid parameter", "Parameter "+param.name+" must be a date in the format YYYY-MM-DD")
 		}
 		return value, nil
 	case string(PathParamTypeDateTime):
 		value, err := time.Parse("2006-01-02T15:04:05Z07:00", raw)
 		if err != nil {
-			return nil, NewErrorResponse(400, "Invalid parameter", "Parameter "+param.name+" must be a datetime in the format YYYY-MM-DDTHH:MM:SSZ")
+			return nil, http_errors.BadRequestError("Invalid parameter", "Parameter "+param.name+" must be a datetime in the format YYYY-MM-DDTHH:MM:SSZ")
 		}
 		return value, nil
 	case string(PathParamTypeObjectID):
 		if oid, err := bson.ObjectIDFromHex(raw); err != nil {
-			return nil, NewErrorResponse(400, "Invalid parameter", "Parameter "+param.name+" must be a valid ObjectID")
+			return nil, http_errors.BadRequestError("Invalid parameter", "Parameter "+param.name+" must be a valid ObjectID")
 		} else {
 			return oid, nil
 		}
 	case string(QueryParamTypeFilter):
 		filter, err := lbq.ParseFilter(raw)
 		if err != nil {
-			return nil, NewErrorResponse(400, "Invalid filter", "Parameter "+param.name+" must be a valid filter: "+err.Error())
+			return nil, http_errors.BadRequestError("Invalid filter", "Parameter "+param.name+" must be a valid filter: "+err.Error())
 		}
 
 		filterBuilder := database.NewFilter().FromLBFilter(filter)
@@ -177,13 +178,13 @@ func parseParam(ctx *EndpointContext, param Param) (any, *ErrorResponse) {
 	case string(QueryParamTypeWhere):
 		where, err := lbq.ParseWhere(raw)
 		if err != nil {
-			return nil, NewErrorResponse(400, "Invalid where clause", "Parameter "+param.name+" must be a valid where clause: "+err.Error())
+			return nil, http_errors.BadRequestError("Invalid where clause", "Parameter "+param.name+" must be a valid where clause: "+err.Error())
 		}
 
 		whereBuilder := database.NewWhere().Raw(where)
 		return whereBuilder, nil
 	default:
-		return nil, NewErrorResponse(400, "Invalid parameter type", "Parameter "+param.name+" has an invalid type")
+		return nil, http_errors.BadRequestError("Invalid parameter type", "Parameter "+param.name+" has an invalid type")
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xompass/vsaas-rest/http_errors"
 	"github.com/xompass/vsaas-rest/lbq"
 
 	"github.com/go-errors/errors"
@@ -56,19 +57,23 @@ func adaptLoopbackFilter(filter lbq.Filter, schema *Schema) (MongoFilter, error)
 
 	result := MongoFilter{}
 
-	parsedWhere, err := buildWhere(where, "", schema.JSONFields)
+	parsedWhere, warnings, err := buildWhere(where, "", schema.JSONFields)
 	if err != nil {
 		return result, err
 	}
 
 	if len(parsedWhere) == 0 && len(filter.Where) != 0 {
-		return result, errors.New("invalid where parameter")
+		if len(warnings) > 0 {
+			return result, http_errors.BadRequestError("Invalid where parameter", warnings)
+		}
+
+		return result, http_errors.BadRequestError("Invalid where parameter", "Invalid where clause")
 	}
 
 	parsedSort := buildSort(filter.Order)
 
 	if len(parsedSort) == 0 && len(filter.Order) != 0 {
-		return result, errors.New("invalid order parameter")
+		return result, http_errors.BadRequestError("Invalid order parameter")
 	}
 
 	result.Where = parsedWhere
@@ -135,13 +140,13 @@ func buildSort(order []lbq.Order) bson.D {
 	return sort
 }
 
-func buildWhere(where lbq.Where, parentField string, fields map[string]*Field) (bson.M, error) {
+func buildWhere(where lbq.Where, parentField string, fields map[string]*Field) (bson.M, []string, error) {
 	if where == nil {
-		return bson.M{}, nil
+		return bson.M{}, nil, nil
 	}
 
 	if _, ok := where["$where"]; ok {
-		return nil, errors.New("invalid where parameter. $where is not allowed")
+		return nil, nil, errors.New("invalid where parameter. $where is not allowed")
 	}
 
 	query := bson.M{}
@@ -152,12 +157,16 @@ func buildWhere(where lbq.Where, parentField string, fields map[string]*Field) (
 
 	exists, hasExistsCond := where["exists"]
 
+	var errorList []string
+	var warningList []string
+
 	switch {
 	case hasExistsCond:
 		if _, ok := exists.(bool); !ok {
-			return nil, errors.New("invalid where parameter. exists must be boolean")
+			errorList = append(errorList, "exists condition must be a boolean")
+		} else {
+			query["$exists"] = exists
 		}
-		query["$exists"] = exists
 	case hasLikeCond:
 		query["$regex"] = like
 		if opts != nil {
@@ -199,7 +208,8 @@ func buildWhere(where lbq.Where, parentField string, fields map[string]*Field) (
 
 				_field, exists := getFieldIfExists(key, fields)
 				if !exists {
-					log.Println("field not exists", key)
+					log.Println("Field does not exist:", key)
+					warningList = append(warningList, "field `"+key+"` does not exist")
 					continue
 				}
 				field = _field
@@ -213,26 +223,32 @@ func buildWhere(where lbq.Where, parentField string, fields map[string]*Field) (
 				barr := bson.A{}
 
 				for _, el := range arr {
-					whr, err := buildWhere(el, parentField, fields)
-					if err != nil {
-						return bson.M{}, err
+					whr, warnings, err := buildWhere(el, parentField, fields)
+					if len(warnings) > 0 {
+						warningList = append(warningList, warnings...)
 					}
-					if len(whr) > 0 {
+
+					if err != nil {
+						errorList = append(errorList, err.Error())
+					} else if len(whr) > 0 {
 						barr = append(barr, whr)
 					}
 				}
 
 				if len(barr) == 0 {
-					return bson.M{}, errors.New("invalid and/or condition")
+					errorList = append(errorList, "invalid and/or condition")
+				} else {
+					query[operatorName] = barr
+				}
+			case lbq.Where:
+				whr, warnings, err := buildWhere(v, key, fields)
+				if len(warnings) > 0 {
+					warningList = append(warningList, warnings...)
 				}
 
-				query[operatorName] = barr
-			case lbq.Where:
-				whr, err := buildWhere(v, key, fields)
 				if err != nil {
-					return bson.M{}, err
-				}
-				if len(whr) > 0 {
+					errorList = append(errorList, err.Error())
+				} else if len(whr) > 0 {
 					query[fieldName] = whr
 				}
 			default:
@@ -281,7 +297,11 @@ func buildWhere(where lbq.Where, parentField string, fields map[string]*Field) (
 		}
 	}
 
-	return query, nil
+	if len(errorList) > 0 {
+		return nil, warningList, errors.New(strings.Join(errorList, ", "))
+	}
+
+	return query, warningList, nil
 }
 
 func getObjectIdArray(val any) ([]bson.ObjectID, error) {

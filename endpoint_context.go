@@ -6,6 +6,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/xompass/vsaas-rest/database"
+	"github.com/xompass/vsaas-rest/http_errors"
 )
 
 type EndpointContext struct {
@@ -40,14 +41,16 @@ func (eCtx *EndpointContext) GetFilterParam() (*database.FilterBuilder, error) {
 		if filterBuilder, ok := filter.(*database.FilterBuilder); ok {
 			return filterBuilder, nil
 		}
-		return nil, NewErrorResponse(400, "Invalid filter parameter", "Filter must be a valid FilterBuilder")
+
+		return nil, http_errors.BadRequestError("Invalid filter query parameter")
 	}
 
 	if filter, ok := eCtx.ParsedHeader["filter"]; ok {
 		if filterBuilder, ok := filter.(*database.FilterBuilder); ok {
 			return filterBuilder, nil
 		}
-		return nil, NewErrorResponse(400, "Invalid filter header", "Filter must be a valid FilterBuilder")
+
+		return nil, http_errors.BadRequestError("Invalid filter header parameter")
 	}
 
 	return nil, nil

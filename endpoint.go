@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/xompass/vsaas-rest/http_errors"
 )
 
 type RateLimit struct {
@@ -91,7 +92,7 @@ type Endpoint struct {
 
 func (ep *Endpoint) run(c echo.Context) error {
 	if ep.Disabled {
-		return NewErrorResponse(404, "Endpoint not found")
+		return http_errors.NotFoundError("Endpoint not found")
 	}
 
 	stdContext := c.Request().Context()

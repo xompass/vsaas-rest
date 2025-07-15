@@ -4,11 +4,14 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/go-errors/errors"
 	"github.com/karagenc/fj4echo"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+
+	"github.com/xompass/vsaas-rest/http_errors"
 )
 
 func NewEchoApp() *echo.Echo {
@@ -34,7 +37,7 @@ func NewEchoApp() *echo.Echo {
 		}
 
 		code := http.StatusInternalServerError
-		responseError := &ErrorResponse{
+		responseError := &http_errors.ErrorResponse{
 			Code:    code,
 			Message: "Internal Server Error",
 		}
@@ -45,22 +48,23 @@ func NewEchoApp() *echo.Echo {
 
 			if e.Message != nil {
 				if str, ok := e.Message.(string); ok {
-					responseError = NewErrorResponse(code, str)
+					responseError = http_errors.NewErrorResponse(code, str)
 				} else if msg, ok := e.Message.(error); ok {
-					responseError = NewErrorResponse(code, msg.Error())
+					responseError = http_errors.NewErrorResponse(code, msg.Error())
 				} else {
 					log.Printf("Unexpected HTTPError: %v", e.Message)
 				}
 			}
-		case *ErrorResponse:
+		case *http_errors.ErrorResponse:
 			responseError = e
 			code = e.Code
 		default:
 			if !isProduction {
 				if goErr, ok := e.(*errors.Error); ok {
-					responseError = NewErrorResponse(http.StatusInternalServerError, goErr.Error(), goErr.ErrorStack())
+					stack := strings.Split(strings.ReplaceAll(goErr.ErrorStack(), "\t", "    "), "\n")
+					responseError = http_errors.NewErrorResponse(http.StatusInternalServerError, goErr.Error(), stack)
 				} else {
-					responseError = NewErrorResponse(http.StatusInternalServerError, e.Error())
+					responseError = http_errors.NewErrorResponse(http.StatusInternalServerError, e.Error())
 				}
 			}
 		}
