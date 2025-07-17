@@ -11,6 +11,6 @@ type Exists struct {
 } // @name ExistsResponse
 
 // Deprecated: Use http_errors.ErrorResponse instead
-func NewErrorResponse(code int, message string, details ...any) *http_errors.ErrorResponse {
+func NewErrorResponse(code int, message string, details ...any) http_errors.ErrorResponse {
 	return http_errors.NewErrorResponse(code, message, details...)
 }

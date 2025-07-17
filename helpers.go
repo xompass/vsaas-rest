@@ -46,7 +46,7 @@ func parseBody(e *Endpoint, ec *EndpointContext) error {
 	return nil
 }
 
-type ParamErrors []*http_errors.ErrorResponse
+type ParamErrors []http_errors.ErrorResponse
 
 func (pe ParamErrors) Error() string {
 	var messages []string
@@ -66,7 +66,12 @@ func parseAllParams(e *Endpoint, ec *EndpointContext) error {
 	for _, param := range e.Accepts {
 		val, err := parseParam(ec, param)
 		if err != nil {
-			paramErrors = append(paramErrors, err)
+			errResponse, ok := err.(http_errors.ErrorResponse)
+			if !ok {
+				errResponse = http_errors.BadRequestError("Invalid parameter", fmt.Sprintf("Parameter %s: %s", param.name, err.Error()))
+			}
+
+			paramErrors = append(paramErrors, errResponse)
 			continue
 		}
 
@@ -87,7 +92,7 @@ func parseAllParams(e *Endpoint, ec *EndpointContext) error {
 	return nil
 }
 
-func parseParam(ctx *EndpointContext, param Param) (any, *http_errors.ErrorResponse) {
+func parseParam(ctx *EndpointContext, param Param) (any, error) {
 	if ctx == nil || ctx.EchoCtx == nil {
 		return nil, http_errors.BadRequestError("Invalid context", "Endpoint context is required to get path parameters")
 	}

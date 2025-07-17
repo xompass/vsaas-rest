@@ -29,6 +29,10 @@ func NewEchoApp() *echo.Echo {
 			return
 		}
 
+		if err == nil {
+			return
+		}
+
 		// Log the full error internally
 		if e, ok := err.(*errors.Error); ok {
 			log.Printf("Unhandled error: %s\n%s", e.Error(), e.ErrorStack())
@@ -37,7 +41,7 @@ func NewEchoApp() *echo.Echo {
 		}
 
 		code := http.StatusInternalServerError
-		responseError := &http_errors.ErrorResponse{
+		responseError := http_errors.ErrorResponse{
 			Code:    code,
 			Message: "Internal Server Error",
 		}
@@ -55,7 +59,7 @@ func NewEchoApp() *echo.Echo {
 					log.Printf("Unexpected HTTPError: %v", e.Message)
 				}
 			}
-		case *http_errors.ErrorResponse:
+		case http_errors.ErrorResponse:
 			responseError = e
 			code = e.Code
 		default:

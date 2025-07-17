@@ -6,53 +6,53 @@ type ErrorResponse struct {
 	Details any    `json:"details,omitempty"` // Optional field for additional error details
 } // @name ErrorResponse
 
-func (e *ErrorResponse) Error() string {
+func (e ErrorResponse) Error() string {
 	return e.Message
 }
 
-func NewErrorResponse(code int, message string, details ...any) *ErrorResponse {
+func NewErrorResponse(code int, message string, details ...any) ErrorResponse {
 	if len(details) > 0 {
-		return &ErrorResponse{
+		return ErrorResponse{
 			Message: message,
 			Code:    code,
 			Details: details[0], // Take the first detail if provided
 		}
 	}
 
-	return &ErrorResponse{
+	return ErrorResponse{
 		Message: message,
 		Code:    code,
 	}
 }
 
-func BadRequestError(message string, details ...any) *ErrorResponse {
+func BadRequestError(message string, details ...any) ErrorResponse {
 	return NewErrorResponse(400, message, details...)
 }
 
-func UnauthorizedError(message string, details ...any) *ErrorResponse {
+func UnauthorizedError(message string, details ...any) ErrorResponse {
 	return NewErrorResponse(401, message, details...)
 }
 
-func ForbiddenError(message string, details ...any) *ErrorResponse {
+func ForbiddenError(message string, details ...any) ErrorResponse {
 	return NewErrorResponse(403, message, details...)
 }
 
-func NotFoundError(message string, details ...any) *ErrorResponse {
+func NotFoundError(message string, details ...any) ErrorResponse {
 	return NewErrorResponse(404, message, details...)
 }
 
-func ConflictError(message string, details ...any) *ErrorResponse {
+func ConflictError(message string, details ...any) ErrorResponse {
 	return NewErrorResponse(409, message, details...)
 }
 
-func UnprocessableEntityError(message string, details ...any) *ErrorResponse {
+func UnprocessableEntityError(message string, details ...any) ErrorResponse {
 	return NewErrorResponse(422, message, details...)
 }
 
-func TooManyRequestsError(message string, details ...any) *ErrorResponse {
+func TooManyRequestsError(message string, details ...any) ErrorResponse {
 	return NewErrorResponse(429, message, details...)
 }
 
-func InternalServerError(message string, details ...any) *ErrorResponse {
+func InternalServerError(message string, details ...any) ErrorResponse {
 	return NewErrorResponse(500, message, details...)
 }
