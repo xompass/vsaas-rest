@@ -27,17 +27,34 @@ func parseBody(e *Endpoint, ec *EndpointContext) error {
 	form := e.BodyParams()
 
 	if form == nil {
-		return nil
+		return http_errors.BadRequestError("Invalid body", "Request body cannot be nil")
 	}
 
 	if err := ec.EchoCtx.Bind(form); err != nil {
 		return http_errors.BadRequestError("Invalid body", fmt.Sprintf("Failed to bind request body: %s", err.Error()))
 	}
 
-	if err := form.Validate(ec); err != nil {
+	if err := ec.SanitizeStruct(form); err != nil {
 		var errResponse *http_errors.ErrorResponse
 		if errors.As(err, &errResponse) {
-			return errResponse // o simplemente return err
+			return errResponse
+		}
+
+		return http_errors.BadRequestError("Invalid body", getFriendlyValidationErrors(err))
+	}
+
+	if err := ec.NormalizeStruct(form); err != nil {
+		var errResponse *http_errors.ErrorResponse
+		if errors.As(err, &errResponse) {
+			return errResponse
+		}
+		return http_errors.BadRequestError("Invalid body", getFriendlyValidationErrors(err))
+	}
+
+	if err := validateAny(ec, form); err != nil {
+		var errResponse *http_errors.ErrorResponse
+		if errors.As(err, &errResponse) {
+			return errResponse
 		}
 		return http_errors.BadRequestError("Invalid body", getFriendlyValidationErrors(err))
 	}
@@ -208,9 +225,9 @@ func getFriendlyValidationErrors(err error) map[string]string {
 		message := err.Error()
 		log.Println("Error parsing validation error:", message)
 		if strings.Contains(message, "field:") {
-			parts := strings.Split(message, ";")
+			parts := strings.SplitSeq(message, ";")
 
-			for _, part := range parts {
+			for part := range parts {
 				field := ""
 				tag := ""
 				kind := ""

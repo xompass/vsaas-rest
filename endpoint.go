@@ -14,10 +14,6 @@ type RateLimit struct {
 	Key    string
 }
 
-type Validable interface {
-	Validate(ctx *EndpointContext) error
-}
-
 type EndpointRole interface {
 	RoleName() string
 }
@@ -70,8 +66,8 @@ type Endpoint struct {
 	Method          EndpointMethod
 	Path            string
 	Handler         func(c *EndpointContext) error
-	Disabled        bool             // If true, the endpoint is disabled and will not be registered or accessible.
-	BodyParams      func() Validable // Function that returns a Validable struct for body validation.
+	Disabled        bool       // If true, the endpoint is disabled and will not be registered or accessible.
+	BodyParams      func() any // Function that returns a struct for body binding.
 	Scope           string
 	RateLimiter     func(*EndpointContext) RateLimit // Function to get rate limit configuration for the endpoint.
 	Public          bool                             // If true, the endpoint is publicly accessible without authentication.

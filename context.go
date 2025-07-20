@@ -14,9 +14,9 @@ type Context interface {
 	Param(name string) string
 	Query(name string) string
 	Body() ([]byte, error)
-	JSON(code int, i interface{}) error
+	JSON(code int, i any) error
 	String(code int, s string) error
-	Bind(i interface{}) error
+	Bind(i any) error
 }
 
 // HandlerFunc represents a generic HTTP handler function
@@ -56,7 +56,7 @@ func (ec *EchoContext) Body() ([]byte, error) {
 	return io.ReadAll(req.Body)
 }
 
-func (ec *EchoContext) JSON(code int, i interface{}) error {
+func (ec *EchoContext) JSON(code int, i any) error {
 	return ec.Context.JSON(code, i)
 }
 
@@ -64,7 +64,7 @@ func (ec *EchoContext) String(code int, s string) error {
 	return ec.Context.String(code, s)
 }
 
-func (ec *EchoContext) Bind(i interface{}) error {
+func (ec *EchoContext) Bind(i any) error {
 	return ec.Context.Bind(i)
 }
 

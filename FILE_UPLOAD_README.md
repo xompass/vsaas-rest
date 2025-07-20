@@ -97,9 +97,9 @@ func UploadHandler(ctx *rest.EndpointContext) error {
     allFiles := ctx.GetAllUploadedFiles()
 
     // Procesar archivos...
-    return ctx.JSON(map[string]interface{}{
+    return ctx.JSON(map[string]any{
         "message": "Archivos subidos exitosamente",
-        "avatar": map[string]interface{}{
+        "avatar": map[string]any{
             "original_name": avatarFile.OriginalName,
             "filename":      avatarFile.Filename,
             "size":          avatarFile.Size,

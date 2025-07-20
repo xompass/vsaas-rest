@@ -42,50 +42,50 @@ func (t *TestModel) BeforeCreate() error {
 // Mock MongoDB Collection
 type MockMongoCollection struct {
 	mock.Mock
-	documents []interface{}
+	documents []any
 }
 
-func (m *MockMongoCollection) Find(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (*mongo.Cursor, error) {
+func (m *MockMongoCollection) Find(ctx context.Context, filter any, opts ...*options.FindOptions) (*mongo.Cursor, error) {
 	args := m.Called(ctx, filter, opts)
 	return args.Get(0).(*mongo.Cursor), args.Error(1)
 }
 
-func (m *MockMongoCollection) FindOne(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) *mongo.SingleResult {
+func (m *MockMongoCollection) FindOne(ctx context.Context, filter any, opts ...*options.FindOneOptions) *mongo.SingleResult {
 	args := m.Called(ctx, filter, opts)
 	return args.Get(0).(*mongo.SingleResult)
 }
 
-func (m *MockMongoCollection) InsertOne(ctx context.Context, document interface{}, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+func (m *MockMongoCollection) InsertOne(ctx context.Context, document any, opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
 	args := m.Called(ctx, document, opts)
 	return args.Get(0).(*mongo.InsertOneResult), args.Error(1)
 }
 
-func (m *MockMongoCollection) UpdateOne(ctx context.Context, filter interface{}, update interface{}, opts ...options.Lister[options.UpdateOneOptions]) (*mongo.UpdateResult, error) {
+func (m *MockMongoCollection) UpdateOne(ctx context.Context, filter any, update any, opts ...options.Lister[options.UpdateOneOptions]) (*mongo.UpdateResult, error) {
 	args := m.Called(ctx, filter, update, opts)
 	return args.Get(0).(*mongo.UpdateResult), args.Error(1)
 }
 
-func (m *MockMongoCollection) UpdateMany(ctx context.Context, filter interface{}, update interface{}, opts ...options.Lister[options.UpdateManyOptions]) (*mongo.UpdateResult, error) {
+func (m *MockMongoCollection) UpdateMany(ctx context.Context, filter any, update any, opts ...options.Lister[options.UpdateManyOptions]) (*mongo.UpdateResult, error) {
 	args := m.Called(ctx, filter, update, opts)
 	return args.Get(0).(*mongo.UpdateResult), args.Error(1)
 }
 
-func (m *MockMongoCollection) DeleteOne(ctx context.Context, filter interface{}, opts ...options.Lister[options.DeleteOneOptions]) (*mongo.DeleteResult, error) {
+func (m *MockMongoCollection) DeleteOne(ctx context.Context, filter any, opts ...options.Lister[options.DeleteOneOptions]) (*mongo.DeleteResult, error) {
 	args := m.Called(ctx, filter, opts)
 	return args.Get(0).(*mongo.DeleteResult), args.Error(1)
 }
 
-func (m *MockMongoCollection) DeleteMany(ctx context.Context, filter interface{}, opts ...options.Lister[options.DeleteManyOptions]) (*mongo.DeleteResult, error) {
+func (m *MockMongoCollection) DeleteMany(ctx context.Context, filter any, opts ...options.Lister[options.DeleteManyOptions]) (*mongo.DeleteResult, error) {
 	args := m.Called(ctx, filter, opts)
 	return args.Get(0).(*mongo.DeleteResult), args.Error(1)
 }
 
-func (m *MockMongoCollection) CountDocuments(ctx context.Context, filter interface{}, opts ...*options.CountOptions) (int64, error) {
+func (m *MockMongoCollection) CountDocuments(ctx context.Context, filter any, opts ...*options.CountOptions) (int64, error) {
 	args := m.Called(ctx, filter, opts)
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (m *MockMongoCollection) FindOneAndUpdate(ctx context.Context, filter interface{}, update interface{}, opts ...*options.FindOneAndUpdateOptions) *mongo.SingleResult {
+func (m *MockMongoCollection) FindOneAndUpdate(ctx context.Context, filter any, update any, opts ...*options.FindOneAndUpdateOptions) *mongo.SingleResult {
 	args := m.Called(ctx, filter, update, opts)
 	return args.Get(0).(*mongo.SingleResult)
 }
@@ -195,7 +195,7 @@ func (m *MockMongoRepository) UpdateById(ctx context.Context, id any, update any
 	}
 
 	// Simple mock update logic
-	if updateMap, ok := update.(map[string]interface{}); ok {
+	if updateMap, ok := update.(map[string]any); ok {
 		if name, exists := updateMap["name"]; exists {
 			doc.Name = name.(string)
 		}
@@ -499,7 +499,7 @@ func TestMongoRepositoryUpdateById(t *testing.T) {
 				return repo
 			},
 			id:      "test-id",
-			update:  map[string]interface{}{"name": "Updated", "email": "updated@example.com"},
+			update:  map[string]any{"name": "Updated", "email": "updated@example.com"},
 			wantErr: false,
 		},
 		{
@@ -508,7 +508,7 @@ func TestMongoRepositoryUpdateById(t *testing.T) {
 				return NewMockMongoRepository()
 			},
 			id:      nil,
-			update:  map[string]interface{}{"name": "Updated"},
+			update:  map[string]any{"name": "Updated"},
 			wantErr: true,
 			errMsg:  "id cannot be nil",
 		},
@@ -528,7 +528,7 @@ func TestMongoRepositoryUpdateById(t *testing.T) {
 				return NewMockMongoRepository()
 			},
 			id:      "non-existing",
-			update:  map[string]interface{}{"name": "Updated"},
+			update:  map[string]any{"name": "Updated"},
 			wantErr: true,
 			errMsg:  "no documents founds",
 		},
@@ -554,7 +554,7 @@ func TestMongoRepositoryUpdateById(t *testing.T) {
 			// Verify the update
 			if tt.id != nil {
 				doc, _ := repo.FindById(ctx, tt.id, nil)
-				if updateMap, ok := tt.update.(map[string]interface{}); ok {
+				if updateMap, ok := tt.update.(map[string]any); ok {
 					if name, exists := updateMap["name"]; exists {
 						assert.Equal(t, name, doc.Name)
 					}

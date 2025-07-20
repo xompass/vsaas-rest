@@ -27,21 +27,21 @@ func ExampleFileUploadHandler(ctx *rest.EndpointContext) error {
 	documentFiles := ctx.GetUploadedFiles("documents")
 
 	// Create response with file information
-	response := map[string]interface{}{
+	response := map[string]any{
 		"message": "Files uploaded successfully",
-		"avatar": map[string]interface{}{
+		"avatar": map[string]any{
 			"original_name": avatarFile.OriginalName,
 			"filename":      avatarFile.Filename,
 			"size":          avatarFile.Size,
 			"extension":     avatarFile.Extension,
 			"mime_type":     avatarFile.MimeType,
 		},
-		"documents": make([]map[string]interface{}, len(documentFiles)),
+		"documents": make([]map[string]any, len(documentFiles)),
 	}
 
 	// Add document files information
 	for i, doc := range documentFiles {
-		response["documents"].([]map[string]interface{})[i] = map[string]interface{}{
+		response["documents"].([]map[string]any)[i] = map[string]any{
 			"original_name": doc.OriginalName,
 			"filename":      doc.Filename,
 			"size":          doc.Size,

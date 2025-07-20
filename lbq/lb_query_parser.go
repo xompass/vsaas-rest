@@ -32,7 +32,7 @@ var operators = map[string]bool{
 
 type AndOrCondition []Where
 
-type Where map[string]interface{} // @name Where
+type Where map[string]any // @name Where
 
 type Fields map[string]bool // @name Fields
 
@@ -141,7 +141,7 @@ func parseWhereValue(where *fastjson.Value) (Where, error) {
 	return result, nestedError
 }
 
-func getRawValue(v *fastjson.Value) interface{} {
+func getRawValue(v *fastjson.Value) any {
 	if v == nil {
 		return nil
 	}
@@ -159,7 +159,7 @@ func getRawValue(v *fastjson.Value) interface{} {
 		return true
 	case fastjson.TypeArray:
 		arr := v.GetArray()
-		var value []interface{}
+		var value []any
 		for _, current := range arr {
 			value = append(value, getRawValue(current))
 		}

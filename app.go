@@ -72,7 +72,7 @@ func (receiver *RestApp) Errorf(format string, args ...any) {
 }
 
 func (receiver *RestApp) log(level LogLevel, format string, args ...any) {
-	if receiver == nil || receiver.options.LogLevel > level {
+	if receiver == nil || receiver.logger == nil || receiver.options.LogLevel > level {
 		return
 	}
 
@@ -117,20 +117,7 @@ func NewRestApp(appOptions RestAppOptions) *RestApp {
 	e := NewEchoApp()
 
 	validate := validator.New()
-
-	// Set the validation tag name to "json" to match the JSON struct tags
-	// When an error occurs, the field name will be derived from the JSON tag
-	validate.RegisterTagNameFunc(func(fld reflect.StructField) string {
-		parts := strings.SplitN(fld.Tag.Get("json"), ",", 2)
-		if len(parts) == 0 {
-			return fld.Name
-		}
-		name := parts[0]
-		if name == "-" {
-			return ""
-		}
-		return name
-	})
+	registerTagNameFunc(validate)
 
 	app := &RestApp{
 		EchoApp:           e,
@@ -218,6 +205,12 @@ func (receiver *RestApp) RegisterEndpoint(ep *Endpoint, r *RouterGroup) {
 	if executor != nil {
 		ep.app = receiver
 
+		if ep.Method == MethodPOST || ep.Method == MethodPUT || ep.Method == MethodPATCH {
+			if ep.BodyParams != nil {
+				registerStruct(ep.BodyParams())
+			}
+		}
+
 		executor(ep.Path, ep.run)
 	} else {
 		log.Fatalf("Unsupported HTTP method %s for endpoint %s", ep.Method, ep.Name)
@@ -248,4 +241,20 @@ func (rg *RouterGroup) Use(m ...MiddlewareFunc) {
 	for _, middleware := range m {
 		rg.echoGroup.Use(convertMiddleware(middleware))
 	}
+}
+
+// registerTagNameFunc sets the tag name function for the validator
+// to use the "json" tag for field names in validation errors.
+func registerTagNameFunc(validate *validator.Validate) {
+	validate.RegisterTagNameFunc(func(fld reflect.StructField) string {
+		parts := strings.SplitN(fld.Tag.Get("json"), ",", 2)
+		if len(parts) == 0 {
+			return fld.Name
+		}
+		name := parts[0]
+		if name == "-" {
+			return ""
+		}
+		return name
+	})
 }
