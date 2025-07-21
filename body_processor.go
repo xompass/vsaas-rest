@@ -69,12 +69,12 @@ func validateAny(ctx *EndpointContext, val any) error {
 		return errors.New("cannot validate nil value")
 	}
 
-	// Caso 1: tiene método Validate
 	if v, ok := val.(Validable); ok {
-		return v.Validate(ctx)
+		if err := v.Validate(ctx); err != nil {
+			return err
+		}
 	}
 
-	// Caso 2: validación automática con validator
 	if isValidable(val) {
 		return ctx.ValidateStruct(val)
 	}

@@ -40,24 +40,12 @@ func (eCtx *EndpointContext) SanitizeStruct(v any) error {
 		return nil
 	}
 
-	if sanitizable, ok := v.(Sanitizeable); ok {
-		if err := sanitizable.Sanitize(eCtx); err != nil {
-			return err
-		}
-	}
-
 	return processStruct(v, "sanitize")
 }
 
 func (eCtx *EndpointContext) NormalizeStruct(v any) error {
 	if v == nil {
 		return nil
-	}
-
-	if normalizable, ok := v.(Normalizeable); ok {
-		if err := normalizable.Normalize(eCtx); err != nil {
-			return err
-		}
 	}
 
 	return processStruct(v, "normalize")

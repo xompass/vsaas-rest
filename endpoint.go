@@ -111,6 +111,11 @@ func (ep *Endpoint) run(c echo.Context) error {
 		return err
 	}
 
+	err = processBody(ctx)
+	if err != nil {
+		return err
+	}
+
 	// Process file uploads only if the endpoint has file upload configuration
 	var uploadedFiles map[string][]*UploadedFile
 	if ep.FileUploadConfig != nil && ep.echoFileUploadHandler != nil {

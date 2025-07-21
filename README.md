@@ -29,7 +29,6 @@ package main
 
 import (
     rest "github.com/xompass/vsaas-rest"
-    "github.com/xompass/vsaas-rest/database"
 )
 
 func main() {
@@ -37,7 +36,7 @@ func main() {
     app := rest.NewRestApp(rest.RestAppOptions{
         Name:              "My API",
         Port:              3000,
-        LogLevel:          rest.LogLevelDebug
+        LogLevel:          rest.LogLevelDebug,
     })
 
     endpoint:= &rest.Endpoint{
@@ -739,6 +738,237 @@ func GetUserPosts(ctx *rest.EndpointContext) error {
 }
 ```
 
+### Error Handling
+
+The framework provides a set of predefined error responses to handle common HTTP errors in a standardized way. These functions, located in the `http_errors` package, simplify error handling and ensure consistent error formats.
+
+Instead of manually creating an `ErrorResponse` with a status code and message, you can use these helper functions:
+
+```go
+import "github.com/xompass/vsaas-rest/http_errors"
+
+func GetProduct(ctx *rest.EndpointContext) error {
+    product, err := repo.FindById(ctx.Context(), ctx.ParsedPath["id"])
+    if err != nil {
+        // Product not found
+        return http_errors.NotFoundError("Product not found")
+    }
+
+    // User does not have permission
+    if !user.HasPermission("read:products") {
+        return http_errors.ForbiddenError("You don't have permission to access this resource")
+    }
+
+    return ctx.JSON(product)
+}
+```
+
+**Available Error Functions:**
+
+| Function                   | Status Code | Description                               |
+| -------------------------- | ----------- | ----------------------------------------- |
+| `BadRequestError`          | 400         | For malformed requests or invalid syntax. |
+| `UnauthorizedError`        | 401         | When authentication is required.          |
+| `ForbiddenError`           | 403         | When the user is not authorized.          |
+| `NotFoundError`            | 404         | When a resource is not found.             |
+| `ConflictError`            | 409         | For conflicts with the current state.     |
+| `UnprocessableEntityError` | 422         | For validation errors.                    |
+| `TooManyRequestsError`     | 429         | For rate limiting.                        |
+| `InternalServerError`      | 500         | For unexpected server errors.             |
+
+All error functions accept an optional `details` parameter to provide more context about the error.
+
+### Body Processing
+
+The framework provides powerful features for processing the request body, including normalization, sanitization, and validation. These operations are executed in the following order:
+
+1.  **Normalization**
+2.  **Sanitization**
+3.  **Validation**
+
+This ensures that incoming data is first cleaned and standardized before being validated against your business rules.
+
+#### Body Normalization and Sanitization
+
+The framework includes a powerful system for normalizing and sanitizing request body data before it reaches your handlers. This is done using struct tags, allowing you to define how each field should be processed.
+
+**How to Use Tags:**
+
+You can apply normalization and sanitization rules to your request body structs using the `normalize` and `sanitize` tags:
+
+```go
+type CreateUserRequest struct {
+    Username string   `json:"username" normalize:"trim,lowercase" sanitize:"alphanumeric"`
+    Comment  string   `json:"comment" normalize:"trim" sanitize:"html"`
+    Website  string   `json:"website" normalize:"trim"`
+    Tags     []string `json:"tags" normalize:"dive,trim,lowercase"`
+}
+```
+
+**Available Processors:**
+
+**Normalization:**
+
+- `trim`: Removes leading and trailing whitespace.
+- `lowercase`: Converts the string to lowercase.
+- `uppercase`: Converts the string to uppercase.
+- `unaccent`: Removes diacritics (accents) from the string.
+- `unicode`: Normalizes the string to its NFC Unicode form.
+
+**Sanitization:**
+
+- `html`: Removes HTML tags using a strict policy (bluemonday's `UGCPolicy`).
+- `alphanumeric`: Removes all non-alphanumeric characters.
+- `numeric`: Removes all non-digit characters.
+
+**Processing Nested Fields with `dive`:**
+
+The `dive` tag is a special directive that allows you to apply processors to elements within slices, arrays, and maps.
+
+- **For Slices and Arrays:** When `dive` is used on a slice of strings, the specified processors are applied to each string in the slice.
+- **For Structs:** If a field is a struct or a slice of structs, `dive` will process the fields of the nested struct(s) according to their own tags.
+
+**Registering Custom Functions:**
+
+You can extend the framework's capabilities by registering your own custom normalization and sanitization functions using `RegisterBodyNormalizer` and `RegisterBodySanitizer`.
+
+**Example:**
+
+Let's say you want to create a custom sanitizer that removes all vowels from a string.
+
+1.  **Define the function:**
+
+    ```go
+    import (
+        "reflect"
+        "strings"
+        rest "github.com/xompass/vsaas-rest"
+    )
+
+    func removeVowels(v reflect.Value) {
+        if v.Kind() == reflect.String {
+            original := v.String()
+            sanitized := strings.NewReplacer("a", "", "e", "", "i", "", "o", "", "u", "").Replace(original)
+            v.SetString(sanitized)
+        }
+    }
+    ```
+
+2.  **Register the function:**
+
+    ```go
+    func main() {
+        err := rest.RegisterBodySanitizer("novowels", removeVowels)
+        if err != nil {
+            panic(err)
+        }
+        // ... start your application
+    }
+    ```
+
+3.  **Use it in your struct:**
+
+    ```go
+    type MyRequest struct {
+        SomeText string `json:"some_text" sanitize:"novowels"`
+    }
+    ```
+
+    Now, any request with the `MyRequest` body will have the `SomeText` field sanitized by removing all vowels.
+
+#### Interface-based Processing
+
+For more complex scenarios where simple tag-based processing is not enough, you can implement the `Normalizeable`, `Sanitizeable`, and `Validable` interfaces on your request body structs. Implementing any of these interfaces gives you **full control** over that specific step of the processing pipeline.
+
+**When an interface is implemented, the corresponding tag-based processing for that step is automatically disabled.** This prevents unpredictable behavior from double-execution and ensures your custom logic is the single source of truth.
+
+**Interfaces:**
+
+```go
+// If implemented, tag-based normalization is skipped.
+type Normalizeable interface {
+    Normalize(ctx *EndpointContext) error
+}
+
+// If implemented, tag-based sanitization is skipped.
+type Sanitizeable interface {
+    Sanitize(ctx *EndpointContext) error
+}
+
+// If implemented, tag-based validation is skipped.
+type Validable interface {
+    Validate(ctx *EndpointContext) error
+}
+```
+
+**Execution Order:**
+
+The body processing pipeline executes in the following order:
+
+1.  **Normalization:**
+    - If the struct implements `Normalizeable`, its `Normalize()` method is called.
+    - Otherwise, standard tag-based normalization (`normalize:"..."`) is performed.
+2.  **Sanitization:**
+    - If the struct implements `Sanitizeable`, its `Sanitize()` method is called.
+    - Otherwise, standard tag-based sanitization (`sanitize:"..."`) is performed.
+3.  **Validation:**
+    - If the struct implements `Validable`, its `Validate()` method is called.
+    - Otherwise, standard tag-based validation (`validate:"..."`) is performed.
+
+**Example:**
+
+```go
+type AdvancedRequest struct {
+    Username string `json:"username" normalize:"trim,lowercase"`
+    Data     string `json:"data"`
+}
+
+// Implement Sanitizeable for complex cleaning logic.
+// Because this is implemented, any `sanitize` tags on AdvancedRequest will be ignored.
+func (r *AdvancedRequest) Sanitize(ctx *rest.EndpointContext) error {
+    // Example: Sanitize the 'Data' field based on user role
+    if !isAdmin(ctx.Principal) {
+        // Non-admins get stricter sanitization
+        r.Data = myCustomSanitizationLogic(r.Data)
+    }
+    return nil
+}
+```
+
+In the example above, the `Username` field will still be normalized based on its `normalize` tag, but the entire struct will only be sanitized by the `Sanitize` method.
+
+#### Manual Tag-based Processing
+
+If you need to trigger tag-based processing from within your own custom interface methods, you can use the helper functions on the `EndpointContext`:
+
+- `ctx.NormalizeStruct(v any) error`
+- `ctx.SanitizeStruct(v any) error`
+
+This is useful when you want to perform some custom logic _before_ or _after_ the standard tag-based processing.
+
+**Example:**
+
+```go
+func (r *AdvancedRequest) Sanitize(ctx *rest.EndpointContext) error {
+    // 1. Perform some custom logic first
+    if r.Data == "some_special_value" {
+        r.Data = ""
+    }
+
+    // 2. Now, run the standard tag-based sanitizers
+    if err := ctx.SanitizeStruct(r); err != nil {
+        return err
+    }
+
+    // 3. Perform more custom logic after
+    if len(r.Data) > 100 {
+        r.Data = r.Data[:100]
+    }
+
+    return nil
+}
+```
+
 #### Request Body Validation
 
 The framework includes a request body validation system using the `Validable` interface and the `go-playground/validator` validator.
@@ -753,7 +983,7 @@ type Validable interface {
 }
 ```
 
-#### Basic Example
+##### Basic Example
 
 ```go
 type CreateProductRequest struct {

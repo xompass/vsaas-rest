@@ -15,6 +15,30 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
+func sanitizeStruct(ctx *EndpointContext, v any) error {
+	if v == nil {
+		return nil
+	}
+
+	if sanitizable, ok := v.(Sanitizeable); ok {
+		return sanitizable.Sanitize(ctx)
+	}
+
+	return processStruct(v, "sanitize")
+}
+
+func normalizeStruct(ctx *EndpointContext, v any) error {
+	if v == nil {
+		return nil
+	}
+
+	if normalizable, ok := v.(Normalizeable); ok {
+		return normalizable.Normalize(ctx)
+	}
+
+	return processStruct(v, "normalize")
+}
+
 func parseBody(e *Endpoint, ec *EndpointContext) error {
 	if e.Method != MethodPOST && e.Method != MethodPUT && e.Method != MethodPATCH {
 		return nil
@@ -34,7 +58,7 @@ func parseBody(e *Endpoint, ec *EndpointContext) error {
 		return http_errors.BadRequestError("Invalid body", fmt.Sprintf("Failed to bind request body: %s", err.Error()))
 	}
 
-	if err := ec.SanitizeStruct(form); err != nil {
+	if err := sanitizeStruct(ec, form); err != nil {
 		var errResponse *http_errors.ErrorResponse
 		if errors.As(err, &errResponse) {
 			return errResponse
@@ -43,7 +67,7 @@ func parseBody(e *Endpoint, ec *EndpointContext) error {
 		return http_errors.BadRequestError("Invalid body", getFriendlyValidationErrors(err))
 	}
 
-	if err := ec.NormalizeStruct(form); err != nil {
+	if err := normalizeStruct(ec, form); err != nil {
 		var errResponse *http_errors.ErrorResponse
 		if errors.As(err, &errResponse) {
 			return errResponse

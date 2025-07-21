@@ -241,7 +241,7 @@ func TestEndpointContext_NormalizeStruct(t *testing.T) {
 	t.Run("interface implementation", func(t *testing.T) {
 		input := &InterfaceTestStruct{Name: "test", Age: 25}
 
-		err := ctx.NormalizeStruct(input)
+		err := normalizeStruct(ctx, input)
 
 		assert.NoError(t, err)
 		assert.Equal(t, "normalized_test", input.Name)
@@ -253,7 +253,7 @@ func TestEndpointContext_NormalizeStruct(t *testing.T) {
 			Email: "  test@example.com  ",
 		}
 
-		err := ctx.NormalizeStruct(input)
+		err := normalizeStruct(ctx, input)
 
 		assert.NoError(t, err)
 		assert.Equal(t, "test", input.Name)
@@ -272,7 +272,9 @@ func TestEndpointContext_SanitizeStruct(t *testing.T) {
 	t.Run("interface implementation", func(t *testing.T) {
 		input := &InterfaceTestStruct{Name: "test", Age: 25}
 
-		err := ctx.SanitizeStruct(input)
+		err := sanitizeStruct(ctx, input)
+
+		log.Println("Sanitized InterfaceTestStruct:", input.Name)
 
 		assert.NoError(t, err)
 		assert.Equal(t, "sanitized_test", input.Name)
@@ -283,7 +285,7 @@ func TestEndpointContext_SanitizeStruct(t *testing.T) {
 			Email: "<script>alert('xss')</script>test@example.com",
 		}
 
-		err := ctx.SanitizeStruct(input)
+		err := sanitizeStruct(ctx, input)
 
 		assert.NoError(t, err)
 		assert.Equal(t, "test@example.com", input.Email)
@@ -530,12 +532,12 @@ type CombinedStruct struct {
 // Implement interfaces
 func (cs *CombinedStruct) Normalize(ctx *EndpointContext) error {
 	cs.Name = "interface_" + cs.Name
-	return nil
+	return ctx.NormalizeStruct(cs)
 }
 
 func (cs *CombinedStruct) Sanitize(ctx *EndpointContext) error {
 	cs.Name = "clean_" + cs.Name
-	return nil
+	return ctx.SanitizeStruct(cs)
 }
 
 func TestCombinedInterfaceAndTags(t *testing.T) {
@@ -545,13 +547,13 @@ func TestCombinedInterfaceAndTags(t *testing.T) {
 		input := &CombinedStruct{Name: "test"}
 
 		// First sanitize (interface only in this case)
-		err := ctx.SanitizeStruct(input)
+		err := sanitizeStruct(ctx, input)
 		require.NoError(t, err)
 		assert.Equal(t, "clean_test", input.Name)
 
 		// Reset and test normalize (interface + tags)
 		input.Name = "test"
-		err = ctx.NormalizeStruct(input)
+		err = normalizeStruct(ctx, input)
 		require.NoError(t, err)
 		// Should have both interface processing and tag processing
 		assert.Equal(t, "INTERFACE_TEST", input.Name)
