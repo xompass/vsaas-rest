@@ -7,6 +7,7 @@ import (
 	"github.com/xompass/vsaas-rest/helpers"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/x/mongo/driver/connstring"
 )
 
 type MongoConnectorOpts struct {
@@ -45,12 +46,24 @@ func NewMongoConnector(opts *MongoConnectorOpts) (*MongoConnector, error) {
 }
 
 func NewDefaultMongoConnector() (*MongoConnector, error) {
-	clientOptions := (&options.ClientOptions{}).ApplyURI(helpers.GetEnv("MONGO_URI", "mongodb://localhost:27017"))
+	uri := helpers.GetEnv("MONGO_URI", "mongodb://localhost:27017")
+
+	clientOptions := (&options.ClientOptions{}).ApplyURI(uri)
+
+	conn, err := connstring.Parse(uri)
+	if err != nil {
+		return nil, err
+	}
+
+	dbName := conn.Database
+	if dbName == "" {
+		dbName = "test"
+	}
 
 	opts := MongoConnectorOpts{
 		ClientOptions: *clientOptions,
 		Name:          "mongodb",
-		Database:      helpers.GetEnv("MONGO_DATABASE", "vsaas_dispatch"),
+		Database:      helpers.GetEnv("MONGO_DATABASE", dbName),
 	}
 
 	return NewMongoConnector(&opts)
