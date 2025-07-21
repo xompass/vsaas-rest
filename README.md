@@ -83,7 +83,7 @@ func main() {
     // Option 1: Use default configuration
     // This uses environment variables:
     // MONGO_URI: MongoDB connection URI, default: `mongodb://localhost:27017`
-    // MONGO_DATABASE: Database name. Required
+    // MONGO_DATABASE: Database name. If not set, it will use the default database from the URI or "test".
     // The connector name will be "mongodb"
     mongoConnector, err := database.NewDefaultMongoConnector()
     if err != nil {
@@ -1157,7 +1157,7 @@ The framework uses the following environment variables:
 ### MongoDB
 
 - `MONGO_URI`: MongoDB connection URI (default: `mongodb://localhost:27017`)
-- `MONGO_DATABASE`: MongoDB database name (required)
+- `MONGO_DATABASE`: MongoDB database name. If not set, it will use the default database from the URI or "test".
 
 ### Redis (for Rate Limiting)
 
