@@ -14,11 +14,89 @@ import (
 	"github.com/xompass/vsaas-rest/http_errors"
 )
 
-func NewEchoApp() *echo.Echo {
+// EchoAppConfig contiene todas las configuraciones para el Echo app
+type EchoAppConfig struct {
+	CORS     *CORSConfig
+	Security *SecurityConfig
+	// Se pueden agregar más configuraciones aquí en el futuro
+	// Rate limiting, compression, etc.
+}
+
+// CORSConfig configuración para CORS middleware
+type CORSConfig struct {
+	Enabled          bool
+	AllowOrigins     []string
+	AllowMethods     []string
+	AllowHeaders     []string
+	AllowCredentials bool
+	AllowOriginFunc  func(origin string) (bool, error)
+	// Se pueden agregar más opciones de CORS según sea necesario
+}
+
+// SecurityConfig configuración para Security middleware
+type SecurityConfig struct {
+	Enabled bool
+	// Se pueden agregar más opciones de seguridad según sea necesario
+}
+
+// DefaultEchoAppConfig retorna una configuración por defecto
+func DefaultEchoAppConfig() EchoAppConfig {
+	return EchoAppConfig{
+		CORS: &CORSConfig{
+			Enabled:      true,
+			AllowOrigins: []string{"*"},
+			AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+			AllowHeaders: []string{"*"},
+		},
+		Security: &SecurityConfig{
+			Enabled: true,
+		},
+	}
+}
+
+func NewEchoApp(config ...EchoAppConfig) *echo.Echo {
+	// Usar configuración por defecto si no se proporciona ninguna
+	var appConfig EchoAppConfig
+	if len(config) > 0 {
+		appConfig = config[0]
+	} else {
+		appConfig = DefaultEchoAppConfig()
+	}
+
 	app := echo.New()
 	app.Use(middleware.Recover())
-	app.Use(middleware.CORS())
-	app.Use(middleware.Secure())
+
+	// Configurar CORS
+	if appConfig.CORS != nil && appConfig.CORS.Enabled {
+		corsConfig := middleware.CORSConfig{}
+
+		if appConfig.CORS.AllowCredentials {
+			corsConfig.AllowCredentials = true
+		}
+
+		if len(appConfig.CORS.AllowOrigins) > 0 {
+			corsConfig.AllowOrigins = appConfig.CORS.AllowOrigins
+		}
+
+		if len(appConfig.CORS.AllowMethods) > 0 {
+			corsConfig.AllowMethods = appConfig.CORS.AllowMethods
+		}
+
+		if len(appConfig.CORS.AllowHeaders) > 0 {
+			corsConfig.AllowHeaders = appConfig.CORS.AllowHeaders
+		}
+
+		if appConfig.CORS.AllowOriginFunc != nil {
+			corsConfig.AllowOriginFunc = appConfig.CORS.AllowOriginFunc
+		}
+
+		app.Use(middleware.CORSWithConfig(corsConfig))
+	}
+
+	// Configurar Security
+	if appConfig.Security != nil && appConfig.Security.Enabled {
+		app.Use(middleware.Secure())
+	}
 
 	app.JSONSerializer = fj4echo.New()
 

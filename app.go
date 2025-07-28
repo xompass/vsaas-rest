@@ -29,6 +29,8 @@ type RestAppOptions struct {
 	EnableRateLimiter bool
 	Authorizer        Authorizer
 	AuditLogConfig    *AuditLogConfig
+	CORS              *CORSConfig     // Configuración de CORS
+	Security          *SecurityConfig // Configuración de Security middleware
 }
 
 type RestApp struct {
@@ -114,7 +116,24 @@ func (receiver *RestApp) Authorize(ctx *EndpointContext) error {
 }
 
 func NewRestApp(appOptions RestAppOptions) *RestApp {
-	e := NewEchoApp()
+	// Construir configuración de Echo a partir de RestAppOptions
+	echoConfig := EchoAppConfig{
+		CORS:     appOptions.CORS,
+		Security: appOptions.Security,
+	}
+
+	// Si no se especificaron configuraciones, usar las por defecto
+	if echoConfig.CORS == nil {
+		defaultConfig := DefaultEchoAppConfig()
+		echoConfig.CORS = defaultConfig.CORS
+	}
+
+	if echoConfig.Security == nil {
+		defaultConfig := DefaultEchoAppConfig()
+		echoConfig.Security = defaultConfig.Security
+	}
+
+	e := NewEchoApp(echoConfig)
 
 	validate := validator.New()
 	registerTagNameFunc(validate)
