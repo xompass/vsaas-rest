@@ -308,7 +308,9 @@ func parseIncludeValue(include *fastjson.Value) ([]Include, error) {
 }
 
 func parseFilterValue(parsedFilter *fastjson.Value) (*Filter, error) {
+
 	if parsedFilter.Type() != fastjson.TypeObject {
+		log.Println("Invalid filter type:", parsedFilter.Type())
 		return nil, errors.New("invalid filter")
 	}
 	whereValue := parsedFilter.Get("where")
@@ -412,6 +414,9 @@ func ParseInclude(f string) ([]Include, error) {
 }
 
 func ParseFilter(f string) (filter *Filter, err error) {
+	if f == "" {
+		return nil, nil
+	}
 	parser := filterPool.Get()
 	parsed, err := parser.Parse(f)
 

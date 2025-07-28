@@ -3,6 +3,7 @@ package rest
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -192,6 +193,9 @@ func parseParam(ctx *EndpointContext, param Param) (any, error) {
 			if _, exists := ctx.EchoCtx.QueryParams()[param.name]; exists && raw == "" {
 				return true, nil
 			}
+			if raw == "" {
+				return false, nil
+			}
 		}
 
 		value, err := strconv.ParseBool(raw)
@@ -227,10 +231,16 @@ func parseParam(ctx *EndpointContext, param Param) (any, error) {
 	case string(QueryParamTypeFilter):
 		filter, err := lbq.ParseFilter(raw)
 		if err != nil {
+			log.Println("Error parsing filter:", err)
 			return nil, http_errors.BadRequestError("Invalid filter", "Parameter "+param.name+" must be a valid filter: "+err.Error())
 		}
 
-		filterBuilder := database.NewFilter().FromLBFilter(filter)
+		filterBuilder := database.NewFilter()
+
+		if filter != nil {
+			filterBuilder = filterBuilder.FromLBFilter(filter)
+		}
+
 		return filterBuilder, nil
 
 	case string(QueryParamTypeWhere):

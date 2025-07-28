@@ -117,7 +117,6 @@ func (b *FilterBuilder) Build() (*lbq.Filter, error) {
 
 func (b *FilterBuilder) FromLBFilter(filter *lbq.Filter) *FilterBuilder {
 	if filter == nil {
-		b.err = errors.New("filter cannot be nil")
 		return b
 	}
 
