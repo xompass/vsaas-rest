@@ -3,12 +3,14 @@ package rest
 type ResponseType string
 
 const (
-	ResponseTypeJSON      ResponseType = "json"
-	ResponseTypeXML       ResponseType = "xml"
-	ResponseTypeText      ResponseType = "text"
-	ResponseTypeHTML      ResponseType = "html"
-	ResponseTypeNoContent ResponseType = "no_content"
-	ResponseTypeFile      ResponseType = "file"
+	ResponseTypeJSON         ResponseType = "json"
+	ResponseTypeXML          ResponseType = "xml"
+	ResponseTypeText         ResponseType = "text"
+	ResponseTypeHTML         ResponseType = "html"
+	ResponseTypeNoContent    ResponseType = "no_content"
+	ResponseTypeFile         ResponseType = "file"
+	ResponseTypeCookie       ResponseType = "cookie"
+	ResponseTypeSecureCookie ResponseType = "secure_cookie"
 )
 
 type EndpointMethod string

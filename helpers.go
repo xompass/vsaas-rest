@@ -3,7 +3,6 @@ package rest
 import (
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -154,8 +153,14 @@ func parseParam(ctx *EndpointContext, param Param) (any, error) {
 		}
 	}
 
-	if param.required && raw == "" {
-		return nil, http_errors.BadRequestError("Missing parameter", fmt.Sprintf("Parameter %s is required", param.name))
+	if param.required {
+		if param.in == InQuery {
+			if _, exists := ctx.EchoCtx.QueryParams()[param.name]; !exists {
+				return nil, http_errors.BadRequestError("Missing parameter", fmt.Sprintf("Parameter %s is required", param.name))
+			}
+		} else if raw == "" {
+			return nil, http_errors.BadRequestError("Missing parameter", fmt.Sprintf("Parameter %s is required", param.name))
+		}
 	}
 
 	if param.Parser != nil {
@@ -167,7 +172,7 @@ func parseParam(ctx *EndpointContext, param Param) (any, error) {
 		return val, nil
 	}
 
-	if raw == "" {
+	if raw == "" && param.in != InQuery {
 		return nil, nil
 	}
 
@@ -182,6 +187,13 @@ func parseParam(ctx *EndpointContext, param Param) (any, error) {
 
 		return value, nil
 	case string(PathParamTypeBool):
+		if param.in == InQuery {
+			// check for params like ?param, this must be equivalent to ?param=true
+			if _, exists := ctx.EchoCtx.QueryParams()[param.name]; exists && raw == "" {
+				return true, nil
+			}
+		}
+
 		value, err := strconv.ParseBool(raw)
 		if err != nil {
 			return nil, http_errors.BadRequestError("Invalid parameter", "Parameter "+param.name+" must be a boolean")
@@ -247,7 +259,7 @@ func getFriendlyValidationErrors(err error) map[string]string {
 		}
 	} else {
 		message := err.Error()
-		log.Println("Error parsing validation error:", message)
+		// log.Println("Error parsing validation error:", message)
 		if strings.Contains(message, "field:") {
 			parts := strings.SplitSeq(message, ";")
 
@@ -295,8 +307,6 @@ func getFriendlyValidationErrors(err error) map[string]string {
 			friendlyErrors["error"] = message
 		}
 	}
-
-	log.Println(friendlyErrors)
 
 	return friendlyErrors
 }

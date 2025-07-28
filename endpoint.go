@@ -116,21 +116,6 @@ func (ep *Endpoint) run(c echo.Context) error {
 		return err
 	}
 
-	// Process file uploads only if the endpoint has file upload configuration
-	var uploadedFiles map[string][]*UploadedFile
-	if ep.FileUploadConfig != nil && ep.echoFileUploadHandler != nil {
-		uploadedFiles, err = ep.echoFileUploadHandler.ProcessStreamingFileUploads(c)
-		if err != nil {
-			return err
-		}
-		ctx.UploadedFiles = uploadedFiles
-
-		// Setup cleanup after response if configured
-		if !ep.FileUploadConfig.KeepFilesAfterSend {
-			defer ep.echoFileUploadHandler.CleanupAfterResponse(uploadedFiles)
-		}
-	}
-
 	err = parseAllParams(ep, ctx)
 	if err != nil {
 		return err
@@ -144,6 +129,21 @@ func (ep *Endpoint) run(c echo.Context) error {
 	err = ep.app.Authorize(ctx)
 	if err != nil {
 		return err
+	}
+
+	// Process file uploads only if the endpoint has file upload configuration
+	var uploadedFiles map[string][]*UploadedFile
+	if ep.FileUploadConfig != nil && ep.echoFileUploadHandler != nil {
+		uploadedFiles, err = ep.echoFileUploadHandler.ProcessStreamingFileUploads(c)
+		if err != nil {
+			return err
+		}
+		ctx.UploadedFiles = uploadedFiles
+
+		// Setup cleanup after response if configured
+		if !ep.FileUploadConfig.KeepFilesAfterSend {
+			defer ep.echoFileUploadHandler.CleanupAfterResponse(uploadedFiles)
+		}
 	}
 
 	// TODO: validate includes

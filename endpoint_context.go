@@ -115,10 +115,24 @@ func (ctx *EndpointContext) RespondAndLog(response any, affectedModelId any, con
 		return echo.NewHTTPError(http.StatusInternalServerError, "html response must be string")
 	case ResponseTypeNoContent:
 		return ctx.EchoCtx.NoContent(status)
-
+	case ResponseTypeCookie:
+	case ResponseTypeSecureCookie:
+		if cookie, ok := response.(http.Cookie); !ok {
+			return echo.NewHTTPError(http.StatusBadRequest, "cookie response must be *http.Cookie")
+		} else {
+			if contentType == ResponseTypeSecureCookie {
+				cookie.Secure = true
+				cookie.HttpOnly = true
+				cookie.SameSite = http.SameSiteLaxMode
+			}
+			ctx.EchoCtx.SetCookie(&cookie)
+		}
+		return ctx.NoContent()
 	default:
 		return echo.NewHTTPError(http.StatusNotAcceptable, "unsupported content type")
 	}
+
+	return nil
 }
 
 // JSON sends a JSON response
@@ -159,6 +173,25 @@ func (ctx *EndpointContext) HTML(response string, statusCode ...int) error {
 	}
 
 	return ctx.EchoCtx.HTML(status, response)
+}
+
+// SendCookie sends a cookie in the response with a 204 No Content status
+func (ctx *EndpointContext) SendCookie(cookie *http.Cookie) error {
+	ctx.EchoCtx.SetCookie(cookie)
+	return ctx.NoContent()
+}
+
+func (ctx *EndpointContext) SendSecureCookie(cookie *http.Cookie) error {
+	if cookie == nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "cookie cannot be nil")
+	}
+
+	cookie.Secure = true
+	cookie.HttpOnly = true
+	cookie.SameSite = http.SameSiteLaxMode
+
+	ctx.EchoCtx.SetCookie(cookie)
+	return ctx.NoContent()
 }
 
 // NoContent sends a 204 No Content response
