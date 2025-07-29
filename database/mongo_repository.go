@@ -164,7 +164,7 @@ func (repository *MongoRepository[T]) FindOne(ctx context.Context, filterBuilder
 	result := repository.collection.FindOne(ctx, query, findOneOptions)
 
 	if result.Err() != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
+		if errors.Is(result.Err(), mongo.ErrNoDocuments) {
 			return nil, nil
 		}
 		return nil, result.Err()
@@ -389,7 +389,7 @@ func (repository *MongoRepository[T]) applyFindOneAndUpdate(ctx context.Context,
 	result := repository.collection.FindOneAndUpdate(ctx, query, fixedUpdate, cmdOpts)
 
 	if err := result.Err(); err != nil {
-		if err == mongo.ErrNoDocuments {
+		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, nil
 		}
 		return nil, err
