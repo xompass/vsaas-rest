@@ -72,7 +72,7 @@ func (eCtx *EndpointContext) GetFilterParam() (*database.FilterBuilder, error) {
 		return nil, http_errors.BadRequestError("Invalid filter header parameter")
 	}
 
-	return nil, nil
+	return database.NewFilter(), nil
 }
 
 /**
