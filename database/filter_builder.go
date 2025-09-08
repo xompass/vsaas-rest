@@ -202,19 +202,10 @@ func NewWhere() *WhereBuilder {
 }
 
 func (b *WhereBuilder) Eq(field string, value any) *WhereBuilder {
-	if err := validateFieldAndValue(field, value); err != nil {
-		b.err = err
-		return b
-	}
-
 	return b.Raw(lbq.Where{field: lbq.Where{"eq": value}})
 }
 
 func (b *WhereBuilder) Neq(field string, value any) *WhereBuilder {
-	if err := validateFieldAndValue(field, value); err != nil {
-		b.err = err
-		return b
-	}
 	return b.Raw(lbq.Where{field: lbq.Where{"neq": value}})
 }
 
