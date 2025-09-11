@@ -201,8 +201,12 @@ func NewWhere() *WhereBuilder {
 	return &WhereBuilder{}
 }
 
-func (b *WhereBuilder) Eq(field string, value any) *WhereBuilder {
-	return b.Raw(lbq.Where{field: lbq.Where{"eq": value}})
+func (b *WhereBuilder) Eq(field string, value any, strict ...bool) *WhereBuilder {
+	if len(strict) > 0 && strict[0] {
+		return b.Raw(lbq.Where{field: lbq.Where{"eq": value}})
+	}
+
+	return b.Raw(lbq.Where{field: value})
 }
 
 func (b *WhereBuilder) Neq(field string, value any) *WhereBuilder {
