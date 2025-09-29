@@ -2,8 +2,9 @@ package database
 
 import (
 	"context"
+	"errors"
 
-	"github.com/go-errors/errors"
+	"github.com/xompass/vsaas-rest/http_errors"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -23,6 +24,76 @@ const (
 	NO_DOCUMENTS   = "no documents founds"
 	MIXED_UPDATE   = "the update has a mix between fields and commands"
 )
+
+// Error codes for mongo_repository
+const (
+	MONGO_CONNECTOR_TYPE_MISMATCH = "MONGO_CONNECTOR_TYPE_MISMATCH"
+	MONGO_CONNECTOR_NIL           = "MONGO_CONNECTOR_NIL"
+	MONGO_CLIENT_NOT_INITIALIZED  = "MONGO_CLIENT_NOT_INITIALIZED"
+	MONGO_DATABASE_NAME_REQUIRED  = "MONGO_DATABASE_NAME_REQUIRED"
+	MONGO_ID_CANNOT_BE_NIL        = "MONGO_ID_CANNOT_BE_NIL"
+	MONGO_UPDATE_CANNOT_BE_NIL    = "MONGO_UPDATE_CANNOT_BE_NIL"
+	MONGO_NO_DOCUMENTS_FOUND      = "MONGO_NO_DOCUMENTS_FOUND"
+	MONGO_DUPLICATE_KEY           = "MONGO_DUPLICATE_KEY"
+	MONGO_OPERATION_FAILED        = "MONGO_OPERATION_FAILED"
+	MONGO_CONNECTION_ERROR        = "MONGO_CONNECTION_ERROR"
+	MONGO_VALIDATION_ERROR        = "MONGO_VALIDATION_ERROR"
+	MONGO_TIMEOUT_ERROR           = "MONGO_TIMEOUT_ERROR"
+)
+
+// mapMongoError maps MongoDB errors to standardized http_errors
+func mapMongoError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// Handle specific MongoDB errors
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return http_errors.NotFoundErrorWithCode(MONGO_NO_DOCUMENTS_FOUND, "document not found")
+	}
+
+	// Handle MongoDB write errors (duplicates, validation, etc.)
+	var writeErr mongo.WriteException
+	if errors.As(err, &writeErr) {
+		for _, writeError := range writeErr.WriteErrors {
+			switch writeError.Code {
+			case 11000, 11001: // Duplicate key errors
+				return http_errors.ConflictErrorWithCode(MONGO_DUPLICATE_KEY, "duplicate key error: "+writeError.Message)
+			case 121: // Document validation failure
+				return http_errors.BadRequestErrorWithCode(MONGO_VALIDATION_ERROR, "validation error: "+writeError.Message)
+			default:
+				return http_errors.BadRequestErrorWithCode(MONGO_OPERATION_FAILED, "write operation failed: "+writeError.Message)
+			}
+		}
+	}
+
+	// Handle bulk write errors
+	var bulkWriteErr mongo.BulkWriteException
+	if errors.As(err, &bulkWriteErr) {
+		return http_errors.BadRequestErrorWithCode(MONGO_OPERATION_FAILED, "bulk write operation failed: "+err.Error())
+	}
+
+	// Handle command errors
+	var commandErr mongo.CommandError
+	if errors.As(err, &commandErr) {
+		switch commandErr.Code {
+		case 11000, 11001: // Duplicate key
+			return http_errors.ConflictErrorWithCode(MONGO_DUPLICATE_KEY, "duplicate key error: "+commandErr.Message)
+		case 121: // Document validation failure
+			return http_errors.BadRequestErrorWithCode(MONGO_VALIDATION_ERROR, "validation error: "+commandErr.Message)
+		default:
+			return http_errors.BadRequestErrorWithCode(MONGO_OPERATION_FAILED, "command failed: "+commandErr.Message)
+		}
+	}
+
+	// Handle network/connection errors
+	if mongo.IsNetworkError(err) || mongo.IsTimeout(err) {
+		return http_errors.InternalServerErrorWithCode(MONGO_CONNECTION_ERROR, "database connection error")
+	}
+
+	// Default case: return as internal server error
+	return http_errors.InternalServerErrorWithCode(MONGO_OPERATION_FAILED, "database operation failed: "+err.Error())
+}
 
 type MongoRepository[T IModel] struct {
 	Options    RepositoryOptions
@@ -50,22 +121,22 @@ func NewMongoRepository[T IModel](ds *Datasource, options RepositoryOptions) (Re
 
 	connector, ok := tmp.(*MongoConnector)
 	if !ok {
-		return nil, errors.Errorf("the connector for model %s is not a MongoConnector", instance.GetModelName())
+		return nil, http_errors.InternalServerErrorWithCode(MONGO_CONNECTOR_TYPE_MISMATCH, "the connector for model "+instance.GetModelName()+" is not a MongoConnector")
 	}
 
 	if connector == nil {
-		return nil, errors.New("connector is nil")
+		return nil, http_errors.InternalServerErrorWithCode(MONGO_CONNECTOR_NIL, "connector is nil")
 	}
 
 	connectorOpts := connector.GetOptions()
 	client, ok := connector.GetDriver().(*mongo.Client)
 	if !ok {
-		return nil, errors.New("the MongoDB client is not initialized correctly")
+		return nil, http_errors.InternalServerErrorWithCode(MONGO_CLIENT_NOT_INITIALIZED, "the MongoDB client is not initialized correctly")
 	}
 
 	databaseName := connectorOpts.Database
 	if databaseName == "" {
-		return nil, errors.New("database name is required")
+		return nil, http_errors.BadRequestErrorWithCode(MONGO_DATABASE_NAME_REQUIRED, "database name is required")
 	}
 
 	repository := &MongoRepository[T]{
@@ -121,12 +192,12 @@ func (repository *MongoRepository[T]) Find(ctx context.Context, filterBuilder *F
 	cursor, err := repository.collection.Find(ctx, query, findOpts)
 
 	if err != nil {
-		return nil, err
+		return nil, mapMongoError(err)
 	}
 
 	var receiver []T
 	if err = cursor.All(ctx, &receiver); err != nil {
-		return nil, err
+		return nil, mapMongoError(err)
 	}
 
 	if receiver == nil {
@@ -167,13 +238,13 @@ func (repository *MongoRepository[T]) FindOne(ctx context.Context, filterBuilder
 		if errors.Is(result.Err(), mongo.ErrNoDocuments) {
 			return nil, nil
 		}
-		return nil, result.Err()
+		return nil, mapMongoError(result.Err())
 	}
 
 	err = result.Decode(receiver)
 
 	if err != nil {
-		return nil, err
+		return nil, mapMongoError(err)
 	}
 
 	// Resolve includes if any
@@ -184,7 +255,7 @@ func (repository *MongoRepository[T]) FindOne(ctx context.Context, filterBuilder
 
 func (repository *MongoRepository[T]) FindById(ctx context.Context, id any, filterBuilder *FilterBuilder) (*T, error) {
 	if id == nil {
-		return nil, errors.New("id cannot be nil")
+		return nil, http_errors.BadRequestErrorWithCode(MONGO_ID_CANNOT_BE_NIL, "id cannot be nil")
 	}
 
 	var filterClone *FilterBuilder
@@ -215,7 +286,7 @@ func (repository *MongoRepository[T]) Insert(ctx context.Context, doc T) (any, e
 	insertedResult, err := repository.collection.InsertOne(ctx, document)
 
 	if err != nil {
-		return nil, err
+		return nil, mapMongoError(err)
 	}
 
 	return insertedResult.InsertedID, nil
@@ -245,7 +316,7 @@ func (repository *MongoRepository[T]) FindOneOrCreate(ctx context.Context, filte
 
 func (repository *MongoRepository[T]) Upsert(ctx context.Context, filterBuilder *FilterBuilder, update any) error {
 	if update == nil {
-		return errors.New("update cannot be nil")
+		return http_errors.BadRequestErrorWithCode(MONGO_UPDATE_CANNOT_BE_NIL, "update cannot be nil")
 	}
 
 	if filterBuilder == nil {
@@ -267,7 +338,7 @@ func (repository *MongoRepository[T]) Upsert(ctx context.Context, filterBuilder 
 
 	_, err = repository.collection.UpdateOne(ctx, query, fixedUpdate, updateOptions)
 	if err != nil {
-		return err
+		return mapMongoError(err)
 	}
 
 	return nil
@@ -275,7 +346,7 @@ func (repository *MongoRepository[T]) Upsert(ctx context.Context, filterBuilder 
 
 func (repository *MongoRepository[T]) UpdateOne(ctx context.Context, filterBuilder *FilterBuilder, update any) error {
 	if update == nil {
-		return errors.New("update cannot be nil")
+		return http_errors.BadRequestErrorWithCode(MONGO_UPDATE_CANNOT_BE_NIL, "update cannot be nil")
 	}
 
 	if filterBuilder == nil {
@@ -289,12 +360,12 @@ func (repository *MongoRepository[T]) UpdateOne(ctx context.Context, filterBuild
 
 	fixedUpdate, err := repository.prepareUpdateDocument(update, UpdateOptions{}, UpdateOptions{})
 	if err != nil {
-		return err
+		return mapMongoError(err)
 	}
 
 	_, err = repository.collection.UpdateOne(ctx, query, fixedUpdate)
 	if err != nil {
-		return err
+		return mapMongoError(err)
 	}
 
 	return nil
@@ -302,11 +373,11 @@ func (repository *MongoRepository[T]) UpdateOne(ctx context.Context, filterBuild
 
 func (repository *MongoRepository[T]) UpdateById(ctx context.Context, id any, update any) error {
 	if id == nil {
-		return errors.New("id cannot be nil")
+		return http_errors.BadRequestErrorWithCode(MONGO_ID_CANNOT_BE_NIL, "id cannot be nil")
 	}
 
 	if update == nil {
-		return errors.New("update cannot be nil")
+		return http_errors.BadRequestErrorWithCode(MONGO_UPDATE_CANNOT_BE_NIL, "update cannot be nil")
 	}
 
 	filter := NewFilter().
@@ -320,7 +391,7 @@ func (repository *MongoRepository[T]) FindOneAndUpdate(ctx context.Context, filt
 
 func (repository *MongoRepository[T]) applyFindOneAndUpdate(ctx context.Context, filterBuilder *FilterBuilder, update any, opts ...*options.FindOneAndUpdateOptions) (*T, error) {
 	if update == nil {
-		return nil, errors.New("update cannot be nil")
+		return nil, http_errors.BadRequestErrorWithCode(MONGO_UPDATE_CANNOT_BE_NIL, "update cannot be nil")
 	}
 
 	if filterBuilder == nil {
@@ -392,12 +463,12 @@ func (repository *MongoRepository[T]) applyFindOneAndUpdate(ctx context.Context,
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, mapMongoError(err)
 	}
 
 	err = result.Decode(receiver)
 	if err != nil {
-		return nil, err
+		return nil, mapMongoError(err)
 	}
 
 	return receiver, nil
@@ -405,7 +476,7 @@ func (repository *MongoRepository[T]) applyFindOneAndUpdate(ctx context.Context,
 
 func (repository *MongoRepository[T]) UpdateMany(ctx context.Context, filterBuilder *FilterBuilder, update any) (int64, error) {
 	if update == nil {
-		return 0, errors.New("update cannot be nil")
+		return 0, http_errors.BadRequestErrorWithCode(MONGO_UPDATE_CANNOT_BE_NIL, "update cannot be nil")
 	}
 
 	if filterBuilder == nil {
@@ -419,12 +490,12 @@ func (repository *MongoRepository[T]) UpdateMany(ctx context.Context, filterBuil
 
 	fixedUpdate, err := repository.prepareUpdateDocument(update, UpdateOptions{}, UpdateOptions{})
 	if err != nil {
-		return 0, err
+		return 0, mapMongoError(err)
 	}
 
 	result, err := repository.collection.UpdateMany(ctx, query, fixedUpdate)
 	if err != nil {
-		return 0, err
+		return 0, mapMongoError(err)
 	}
 
 	return result.ModifiedCount, nil
@@ -439,12 +510,16 @@ func (repository *MongoRepository[T]) Count(ctx context.Context, filterBuilder *
 		return 0, err
 	}
 
-	return repository.collection.CountDocuments(ctx, query)
+	count, err := repository.collection.CountDocuments(ctx, query)
+	if err != nil {
+		return 0, mapMongoError(err)
+	}
+	return count, nil
 }
 
 func (repository *MongoRepository[T]) Exists(ctx context.Context, id any) (bool, error) {
 	if id == nil {
-		return false, errors.New("id cannot be nil")
+		return false, http_errors.BadRequestErrorWithCode(MONGO_ID_CANNOT_BE_NIL, "id cannot be nil")
 	}
 
 	filter := NewFilter().
@@ -478,20 +553,20 @@ func (repository *MongoRepository[T]) DeleteOne(ctx context.Context, filterBuild
 	if repository.Options.Deleted {
 		result, err := repository.collection.UpdateOne(ctx, query, bson.M{CURRENT_DATE: bson.M{DELETED: true}})
 		if err != nil {
-			return err
+			return mapMongoError(err)
 		}
 		if result.MatchedCount == 0 {
-			return errors.New(NO_DOCUMENTS)
+			return http_errors.NotFoundErrorWithCode(MONGO_NO_DOCUMENTS_FOUND, NO_DOCUMENTS)
 		}
 		return nil
 	}
 
 	result, err := repository.collection.DeleteOne(ctx, query)
 	if err != nil {
-		return err
+		return mapMongoError(err)
 	}
 	if result.DeletedCount == 0 {
-		return errors.New(NO_DOCUMENTS)
+		return http_errors.NotFoundErrorWithCode(MONGO_NO_DOCUMENTS_FOUND, NO_DOCUMENTS)
 	}
 
 	return nil
@@ -499,7 +574,7 @@ func (repository *MongoRepository[T]) DeleteOne(ctx context.Context, filterBuild
 
 func (repository *MongoRepository[T]) DeleteById(ctx context.Context, id any) error {
 	if id == nil {
-		return errors.New("id cannot be nil")
+		return http_errors.BadRequestErrorWithCode(MONGO_ID_CANNOT_BE_NIL, "id cannot be nil")
 	}
 
 	filterBuilder := NewFilter().
@@ -521,14 +596,14 @@ func (repository *MongoRepository[T]) DeleteMany(ctx context.Context, filterBuil
 	if repository.Options.Deleted {
 		result, err := repository.collection.UpdateMany(ctx, query, bson.M{CURRENT_DATE: bson.M{DELETED: true}})
 		if err != nil {
-			return 0, err
+			return 0, mapMongoError(err)
 		}
 		return result.ModifiedCount, nil
 	}
 
 	result, err := repository.collection.DeleteMany(ctx, query)
 	if err != nil {
-		return 0, err
+		return 0, mapMongoError(err)
 	}
 
 	return result.DeletedCount, nil

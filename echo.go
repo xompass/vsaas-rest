@@ -118,40 +118,42 @@ func NewEchoApp(config ...EchoAppConfig) *echo.Echo {
 			log.Printf("Unhandled error: %s", err.Error())
 		}
 
-		code := http.StatusInternalServerError
+		statusCode := http.StatusInternalServerError
+		errorCode := "INTERNAL_SERVER_ERROR"
 		responseError := http_errors.ErrorResponse{
-			Code:    code,
-			Message: "Internal Server Error",
+			StatusCode: statusCode,
+			ErrorCode:  errorCode,
+			Message:    "Internal Server Error",
 		}
 
 		switch e := err.(type) {
 		case *echo.HTTPError:
-			code = e.Code
+			statusCode = e.Code
 
 			if e.Message != nil {
 				if str, ok := e.Message.(string); ok {
-					responseError = http_errors.NewErrorResponse(code, str)
+					responseError = http_errors.NewErrorResponse(statusCode, errorCode, str)
 				} else if msg, ok := e.Message.(error); ok {
-					responseError = http_errors.NewErrorResponse(code, msg.Error())
+					responseError = http_errors.NewErrorResponse(statusCode, errorCode, msg.Error())
 				} else {
 					log.Printf("Unexpected HTTPError: %v", e.Message)
 				}
 			}
 		case http_errors.ErrorResponse:
 			responseError = e
-			code = e.Code
+			statusCode = e.StatusCode
 		default:
 			if !isProduction {
 				if goErr, ok := e.(*errors.Error); ok {
 					stack := strings.Split(strings.ReplaceAll(goErr.ErrorStack(), "\t", "    "), "\n")
-					responseError = http_errors.NewErrorResponse(http.StatusInternalServerError, goErr.Error(), stack)
+					responseError = http_errors.NewErrorResponse(http.StatusInternalServerError, errorCode, goErr.Error(), stack)
 				} else {
-					responseError = http_errors.NewErrorResponse(http.StatusInternalServerError, e.Error())
+					responseError = http_errors.NewErrorResponse(http.StatusInternalServerError, errorCode, e.Error())
 				}
 			}
 		}
 
-		c.JSON(code, responseError)
+		c.JSON(statusCode, responseError)
 	}
 
 	return app

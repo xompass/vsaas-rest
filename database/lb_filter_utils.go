@@ -9,8 +9,6 @@ import (
 	"github.com/xompass/vsaas-rest/http_errors"
 	"github.com/xompass/vsaas-rest/lbq"
 
-	"github.com/go-errors/errors"
-
 	"github.com/simplereach/timeutils"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -32,6 +30,20 @@ var Operators = map[string]string{
 const (
 	DtObjectID = "ObjectID"
 	DtDate     = "Date"
+)
+
+// Error codes for lb_filter_utils
+const (
+	INVALID_WHERE_PARAMETER     = "INVALID_WHERE_PARAMETER"
+	INVALID_ORDER_PARAMETER     = "INVALID_ORDER_PARAMETER"
+	WHERE_CLAUSE_NOT_ALLOWED    = "WHERE_CLAUSE_NOT_ALLOWED"
+	INVALID_EXISTS_CONDITION    = "INVALID_EXISTS_CONDITION"
+	INVALID_AND_OR_CONDITION    = "INVALID_AND_OR_CONDITION"
+	INVALID_OBJECTID_COLLECTION = "INVALID_OBJECTID_COLLECTION"
+	INVALID_OBJECTID            = "INVALID_OBJECTID"
+	INVALID_DATE_COLLECTION     = "INVALID_DATE_COLLECTION"
+	INVALID_DATE                = "INVALID_DATE"
+	INVALID_DATE_FORMAT         = "INVALID_DATE_FORMAT"
 )
 
 type MongoFilterOptions struct {
@@ -64,16 +76,16 @@ func adaptLoopbackFilter(filter lbq.Filter, schema *Schema) (MongoFilter, error)
 
 	if len(parsedWhere) == 0 && len(filter.Where) != 0 {
 		if len(warnings) > 0 {
-			return result, http_errors.BadRequestError("Invalid where parameter", warnings)
+			return result, http_errors.BadRequestErrorWithCode(INVALID_WHERE_PARAMETER, "Invalid where parameter", warnings)
 		}
 
-		return result, http_errors.BadRequestError("Invalid where parameter", "Invalid where clause")
+		return result, http_errors.BadRequestErrorWithCode(INVALID_WHERE_PARAMETER, "Invalid where parameter", "Invalid where clause")
 	}
 
 	parsedSort := buildSort(filter.Order)
 
 	if len(parsedSort) == 0 && len(filter.Order) != 0 {
-		return result, http_errors.BadRequestError("Invalid order parameter")
+		return result, http_errors.BadRequestErrorWithCode(INVALID_ORDER_PARAMETER, "Invalid order parameter")
 	}
 
 	result.Where = parsedWhere
@@ -146,7 +158,7 @@ func buildWhere(where lbq.Where, parentField string, fields map[string]*Field) (
 	}
 
 	if _, ok := where["$where"]; ok {
-		return nil, nil, errors.New("invalid where parameter. $where is not allowed")
+		return nil, nil, http_errors.BadRequestErrorWithCode(WHERE_CLAUSE_NOT_ALLOWED, "invalid where parameter. $where is not allowed")
 	}
 
 	query := bson.M{}
@@ -163,7 +175,7 @@ func buildWhere(where lbq.Where, parentField string, fields map[string]*Field) (
 	switch {
 	case hasExistsCond:
 		if _, ok := exists.(bool); !ok {
-			errorList = append(errorList, "exists condition must be a boolean")
+			errorList = append(errorList, INVALID_EXISTS_CONDITION)
 		} else {
 			query["$exists"] = exists
 		}
@@ -236,7 +248,7 @@ func buildWhere(where lbq.Where, parentField string, fields map[string]*Field) (
 				}
 
 				if len(barr) == 0 {
-					errorList = append(errorList, "invalid and/or condition")
+					errorList = append(errorList, INVALID_AND_OR_CONDITION)
 				} else {
 					query[operatorName] = barr
 				}
@@ -298,7 +310,7 @@ func buildWhere(where lbq.Where, parentField string, fields map[string]*Field) (
 	}
 
 	if len(errorList) > 0 {
-		return nil, warningList, errors.New(strings.Join(errorList, ", "))
+		return nil, warningList, http_errors.BadRequestErrorWithCode(INVALID_WHERE_PARAMETER, strings.Join(errorList, ", "))
 	}
 
 	return query, warningList, nil
@@ -321,7 +333,7 @@ func getObjectIdArray(val any) ([]bson.ObjectID, error) {
 
 		return arr, valErr
 	} else {
-		return nil, errors.New("invalid objectid collection")
+		return nil, http_errors.BadRequestErrorWithCode(INVALID_OBJECTID_COLLECTION, "invalid objectid collection")
 	}
 }
 
@@ -348,11 +360,11 @@ func getObjectId(val any) (bson.ObjectID, error) {
 	case *bson.ObjectID:
 		oid, _ := val.(*bson.ObjectID)
 		if oid == nil {
-			return bson.ObjectID{}, errors.New("invalid ObjectID")
+			return bson.ObjectID{}, http_errors.BadRequestErrorWithCode(INVALID_OBJECTID, "invalid ObjectID")
 		}
 		return *oid, nil
 	default:
-		return bson.ObjectID{}, errors.New("invalid ObjectID")
+		return bson.ObjectID{}, http_errors.BadRequestErrorWithCode(INVALID_OBJECTID, "invalid ObjectID")
 	}
 }
 
@@ -360,7 +372,7 @@ func getObjectId(val any) (bson.ObjectID, error) {
 func getDateArray(val any) ([]time.Time, error) {
 	valArr, ok := val.([]any)
 	if !ok {
-		return nil, errors.New("invalid date collection")
+		return nil, http_errors.BadRequestErrorWithCode(INVALID_DATE_COLLECTION, "invalid date collection")
 	}
 
 	var arr []time.Time
@@ -389,7 +401,7 @@ func getDateOrNil(val any) (*time.Time, error) {
 // getDate returns a time.Time value from the given value.
 func getDate(val any) (time.Time, error) {
 	if val == nil {
-		return time.Time{}, errors.New("invalid date")
+		return time.Time{}, http_errors.BadRequestErrorWithCode(INVALID_DATE, "invalid date")
 	}
 
 	switch v := val.(type) {
@@ -406,7 +418,7 @@ func getDate(val any) (time.Time, error) {
 	case *int64:
 		return time.Unix(*v, 0), nil
 	default:
-		return time.Time{}, errors.New("invalidate date format")
+		return time.Time{}, http_errors.BadRequestErrorWithCode(INVALID_DATE_FORMAT, "invalid date format")
 	}
 }
 

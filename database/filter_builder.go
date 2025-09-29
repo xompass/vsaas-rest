@@ -10,6 +10,15 @@ import (
 	"github.com/xompass/vsaas-rest/lbq"
 )
 
+const (
+	FILTER_FIELD_EMPTY                    = "FILTER_FIELD_EMPTY"
+	FILTER_INVALID_DIRECTION              = "FILTER_INVALID_DIRECTION"
+	FILTER_WHERE_EMPTY                    = "FILTER_WHERE_EMPTY"
+	FILTER_CANNOT_MIX_INCLUSION_EXCLUSION = "FILTER_CANNOT_MIX_INCLUSION_EXCLUSION"
+	FILTER_WHERE_CANNOT_BE_NIL            = "FILTER_WHERE_CANNOT_BE_NIL"
+	FILTER_VALUE_CANNOT_BE_NIL            = "FILTER_VALUE_CANNOT_BE_NIL"
+)
+
 type FilterBuilder struct {
 	where   []lbq.Where
 	fields  lbq.Fields
@@ -44,13 +53,13 @@ func (b *FilterBuilder) Skip(skip uint) *FilterBuilder {
 }
 
 func (b *FilterBuilder) orderBy(field string, direction string) *FilterBuilder {
-	if field == "" {
-		b.err = errors.New("field cannot be empty")
+	if strings.TrimSpace(field) == "" {
+		b.err = errors.New(FILTER_FIELD_EMPTY)
 		return b
 	}
 	direction = strings.ToUpper(direction)
 	if direction != "ASC" && direction != "DESC" {
-		b.err = errors.New("direction must be either ASC or DESC")
+		b.err = errors.New(FILTER_INVALID_DIRECTION)
 		return b
 	}
 	b.order = append(b.order, lbq.Order{Field: field, Direction: direction})
@@ -78,7 +87,7 @@ func (f *FilterBuilder) WithWhere(builder *WhereBuilder) *FilterBuilder {
 	}
 
 	if len(where) == 0 {
-		f.err = errors.New("invalid where condition: cannot be empty")
+		f.err = errors.New(FILTER_WHERE_EMPTY)
 		return f
 	}
 
@@ -102,7 +111,7 @@ func (b *FilterBuilder) Build() (*lbq.Filter, error) {
 	}
 
 	if !isValidProjection(b.fields) {
-		return nil, errors.New("invalid fields projection: cannot mix inclusion and exclusion of fields")
+		return nil, errors.New(FILTER_CANNOT_MIX_INCLUSION_EXCLUSION)
 	}
 
 	return &lbq.Filter{
@@ -128,7 +137,7 @@ func (b *FilterBuilder) FromLBFilter(filter *lbq.Filter) *FilterBuilder {
 	b.include = filter.Include
 
 	if !isValidProjection(b.fields) {
-		b.err = errors.New("invalid fields projection: cannot mix inclusion and exclusion of fields")
+		b.err = errors.New(FILTER_CANNOT_MIX_INCLUSION_EXCLUSION)
 	}
 
 	return b
@@ -355,7 +364,7 @@ func (b *WhereBuilder) And(builders ...*WhereBuilder) *WhereBuilder {
 
 func (b *WhereBuilder) Build() (lbq.Where, error) {
 	if b == nil {
-		return nil, errors.New("where builder cannot be nil")
+		return nil, errors.New(FILTER_WHERE_CANNOT_BE_NIL)
 	}
 
 	if b.err != nil {
@@ -396,10 +405,10 @@ func isValidProjection(fields map[string]bool) bool {
 
 func validateFieldAndValue(field string, value any) error {
 	if strings.TrimSpace(field) == "" {
-		return errors.New("field cannot be empty or whitespace")
+		return errors.New(FILTER_FIELD_EMPTY)
 	}
 	if value == nil {
-		return errors.New("value cannot be nil")
+		return errors.New(FILTER_VALUE_CANNOT_BE_NIL)
 	}
 	return nil
 }

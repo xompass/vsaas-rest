@@ -51,11 +51,11 @@ func parseBody(e *Endpoint, ec *EndpointContext) error {
 	form := e.BodyParams()
 
 	if form == nil {
-		return http_errors.BadRequestError("Invalid body", "Request body cannot be nil")
+		return http_errors.BadRequestError("Request body cannot be nil")
 	}
 
 	if err := ec.EchoCtx.Bind(form); err != nil {
-		return http_errors.BadRequestError("Invalid body", fmt.Sprintf("Failed to bind request body: %s", err.Error()))
+		return http_errors.BadRequestError("Failed to bind request body", fmt.Sprintf("Failed to bind request body: %s", err.Error()))
 	}
 
 	if err := sanitizeStruct(ec, form); err != nil {
@@ -64,7 +64,7 @@ func parseBody(e *Endpoint, ec *EndpointContext) error {
 			return errResponse
 		}
 
-		return http_errors.BadRequestError("Invalid body", getFriendlyValidationErrors(err))
+		return http_errors.BadRequestError("Failed to sanitize request body", getFriendlyValidationErrors(err))
 	}
 
 	if err := normalizeStruct(ec, form); err != nil {
@@ -72,7 +72,7 @@ func parseBody(e *Endpoint, ec *EndpointContext) error {
 		if errors.As(err, &errResponse) {
 			return errResponse
 		}
-		return http_errors.BadRequestError("Invalid body", getFriendlyValidationErrors(err))
+		return http_errors.BadRequestError("Failed to normalize request body", getFriendlyValidationErrors(err))
 	}
 
 	if err := validateAny(ec, form); err != nil {
@@ -80,7 +80,7 @@ func parseBody(e *Endpoint, ec *EndpointContext) error {
 		if errors.As(err, &errResponse) {
 			return errResponse
 		}
-		return http_errors.BadRequestError("Invalid body", getFriendlyValidationErrors(err))
+		return http_errors.BadRequestError("Failed to validate request body", getFriendlyValidationErrors(err))
 	}
 
 	ec.ParsedBody = form
