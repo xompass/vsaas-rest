@@ -175,3 +175,71 @@ func GetDatasourceModelRepository[T IModel](datasource *Datasource, model T) (Re
 
 	return nil, errors.Errorf("the repository for model %s is not of the expected type", model.GetModelName())
 }
+
+/**
+ * EnsureIndexes ensures that all indexes defined in registered models are created.
+ * This method should be called after all models are registered.
+ * It will delegate to the appropriate IndexManager for each connector type.
+ */
+func (receiver *Datasource) EnsureIndexes() error {
+	if receiver == nil {
+		return errors.New("datasource is nil")
+	}
+
+	if len(receiver.models) == 0 {
+		return nil // No models to process
+	}
+
+	for modelName, model := range receiver.models {
+		connector, err := receiver.GetModelConnector(model)
+		if err != nil {
+			return errors.Errorf("failed to get connector for model %s: %v", modelName, err)
+		}
+
+		// Check if connector is MongoDB
+		if mongoConnector, ok := connector.(*MongoConnector); ok {
+			indexManager := mongoConnector.GetIndexManager()
+			if indexManager != nil {
+				if err := indexManager.EnsureIndexes(model); err != nil {
+					return errors.Errorf("failed to ensure indexes for model %s: %v", modelName, err)
+				}
+			}
+		}
+		// Future: Add support for other database types here
+		// else if postgresConnector, ok := connector.(*PostgresConnector); ok {
+		//     indexManager := postgresConnector.GetIndexManager()
+		//     if err := indexManager.EnsureIndexes(model); err != nil {
+		//         return err
+		//     }
+		// }
+	}
+
+	return nil
+}
+
+/**
+ * EnsureIndexesForModel ensures indexes for a specific model.
+ * This is useful when you want to ensure indexes for a single model
+ * instead of all registered models.
+ */
+func (receiver *Datasource) EnsureIndexesForModel(model IModel) error {
+	if receiver == nil {
+		return errors.New("datasource is nil")
+	}
+
+	connector, err := receiver.GetModelConnector(model)
+	if err != nil {
+		return errors.Errorf("failed to get connector for model %s: %v", model.GetModelName(), err)
+	}
+
+	// Check if connector is MongoDB
+	if mongoConnector, ok := connector.(*MongoConnector); ok {
+		indexManager := mongoConnector.GetIndexManager()
+		if indexManager != nil {
+			return indexManager.EnsureIndexes(model)
+		}
+	}
+	// Future: Add support for other database types
+
+	return nil
+}

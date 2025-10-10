@@ -17,9 +17,10 @@ type MongoConnectorOpts struct {
 }
 
 type MongoConnector struct {
-	ctx     context.Context
-	client  *mongo.Client
-	options *MongoConnectorOpts
+	ctx          context.Context
+	client       *mongo.Client
+	options      *MongoConnectorOpts
+	indexManager *MongoIndexManager
 }
 
 /**
@@ -82,6 +83,7 @@ func (receiver *MongoConnector) connect() error {
 	}
 
 	receiver.client = client
+	receiver.indexManager = NewMongoIndexManager(receiver)
 	return nil
 }
 
@@ -125,4 +127,11 @@ func (receiver *MongoConnector) GetDatabaseName() string {
  */
 func (receiver *MongoConnector) GetOptions() MongoConnectorOpts {
 	return *receiver.options
+}
+
+/**
+ * GetIndexManager returns the index manager for this connector.
+ */
+func (receiver *MongoConnector) GetIndexManager() *MongoIndexManager {
+	return receiver.indexManager
 }

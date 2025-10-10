@@ -6,6 +6,7 @@ VSAAS REST Framework is a web framework built on Echo v4 for building REST APIs 
 
 - High-performance HTTP server (Echo v4)
 - Extensible database connectors (MongoDB supported)
+- Database-agnostic index management with automatic comparison and warnings
 - Role-based authentication and authorization
 - Automatic operation auditing
 - Redis-based rate limiting
@@ -287,6 +288,131 @@ err = repo.DeleteById(ctx, itemID)
 // Delete multiple
 deletedCount, err := repo.DeleteMany(ctx, filter)
 ```
+
+### Database Indexes
+
+The framework provides a database-agnostic way to define and manage indexes for your models. Currently, MongoDB is fully supported with all index types.
+
+#### Defining Indexes
+
+Implement the `MongoIndexableModel` interface in your model:
+
+```go
+import "github.com/xompass/vsaas-rest/database"
+
+func (p Product) DefineMongoIndexes() []database.MongoIndexDefinition {
+    return []database.MongoIndexDefinition{
+        // Simple unique index
+        database.NewMongoSimpleIndex("sku", true),
+
+        // Compound index
+        database.NewMongoCompoundIndex(
+            "category_price_idx",
+            []database.IndexField{
+                {Name: "category", Order: 1},
+                {Name: "price", Order: -1},
+            },
+            false,
+        ),
+
+        // Text search index
+        database.NewMongoTextIndex("name_desc_text", []string{"name", "description"}).
+            WithWeights(map[string]int32{"name": 10, "description": 5}).
+            WithDefaultLanguage("spanish"),
+
+        // Geospatial index (2dsphere)
+        database.NewMongo2DSphereIndex("location"),
+
+        // TTL index (auto-delete after 30 days)
+        database.NewMongoTTLIndex("expiresAt", 30*24*time.Hour),
+
+        // Compound TTL index (recommended for better query performance)
+        database.NewMongoCompoundTTLIndex(
+            "userId_expiresAt_ttl",
+            []database.IndexField{
+                {Name: "userId", Order: 1},
+                {Name: "expiresAt", Order: 1},
+            },
+            24*time.Hour,
+        ),
+
+        // Advanced: Partial index with sparse option
+        database.NewMongoCompoundIndex(
+            "active_products_idx",
+            []database.IndexField{
+                {Name: "isActive", Order: 1},
+                {Name: "price", Order: 1},
+            },
+            false,
+        ).WithPartialFilter(map[string]any{
+            "deleted": nil,
+            "price": map[string]any{"$gt": 0},
+        }).WithSparse(true),
+    }
+}
+```
+
+#### Available Index Types
+
+- **Simple**: `NewMongoSimpleIndex(field, unique)`
+- **Compound**: `NewMongoCompoundIndex(name, fields, unique)`
+- **Text**: `NewMongoTextIndex(name, fields)`
+- **TTL**: `NewMongoTTLIndex(field, duration)` or `NewMongoCompoundTTLIndex(name, fields, duration)`
+- **Geospatial**: `NewMongo2DSphereIndex(field)`
+- **Hashed**: `NewMongoHashedIndex(field)`
+
+#### Fluent API Configuration
+
+Chain methods to configure index options:
+
+```go
+database.NewMongoCompoundIndex(name, fields, false).
+    WithTTL(90*24*time.Hour).                    // Add TTL
+    WithPartialFilter(filter).                    // Partial index
+    WithSparse(true).                             // Sparse index
+    WithHidden(true).                             // Hidden from query planner
+    WithCollation(&database.MongoCollation{...}). // Collation options
+    WithWeights(weights)                          // Text search weights
+```
+
+#### Ensuring Indexes
+
+Call `EnsureIndexes()` after registering all models:
+
+```go
+func main() {
+    ds := &database.Datasource{}
+    ds.AddConnector(mongoConnector)
+
+    // Register your repositories here
+
+    // Create indexes and compare with existing ones
+    if err := ds.EnsureIndexes(); err != nil {
+        log.Printf("Warning: Failed to ensure indexes: %v", err)
+    }
+
+    // Alternative: Ensure indexes for a specific model
+    // ds.EnsureIndexesForModel(&Product{})
+}
+```
+
+#### Index Comparison and Warnings
+
+When `EnsureIndexes()` runs, it automatically compares defined indexes with existing ones in the database and logs warnings:
+
+```
+Index warnings for Product:
+  [missing_in_code] Index 'old_index_1' exists in database but is not defined in code
+  [missing_in_db] Index 'new_index_1' is defined in code but does not exist in database
+  [different] Index 'sku_1' differs: unique constraint differs
+Successfully ensured 8 indexes for Product: [sku_1 category_price_idx ...]
+```
+
+Warning types:
+
+- `missing_in_code`: Index exists in DB but not in code definition
+- `missing_in_db`: Index defined in code but not created in DB yet
+- `different`: Index exists in both but with different options
 
 ### Filters and Queries
 
