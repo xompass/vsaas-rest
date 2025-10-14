@@ -177,6 +177,10 @@ func parseParam(ctx *EndpointContext, param Param) (any, error) {
 		return nil, nil
 	}
 
+	if raw == "" && param.in == InQuery && param.paramType != string(PathParamTypeBool) {
+		return nil, nil
+	}
+
 	switch param.paramType {
 	case string(PathParamTypeString):
 		return raw, nil

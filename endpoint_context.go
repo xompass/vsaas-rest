@@ -55,7 +55,7 @@ func (eCtx *EndpointContext) NormalizeStruct(v any) error {
 func (eCtx *EndpointContext) GetFilterParam() (*database.FilterBuilder, error) {
 	if filter, ok := eCtx.ParsedQuery["filter"]; ok {
 		if filter == nil {
-			return nil, nil
+			return database.NewFilter(), nil
 		}
 		if filterBuilder, ok := filter.(*database.FilterBuilder); ok {
 			return filterBuilder, nil
