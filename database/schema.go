@@ -227,15 +227,28 @@ func (s *Schema) InitField(model *reflect.Value, fieldStruct reflect.StructField
 		}
 	case reflect.Slice, reflect.Array:
 		fieldValue = reflect.New(fieldType.Elem()).Elem()
-		// val = fieldValue.Interface()
+		val = fieldValue.Interface()
 		fieldType = fieldValue.Type()
-		// fieldKind = fieldValue.Kind()
+		fieldKind = fieldValue.Kind()
+
 		if field.IndirectFieldType.Name() == "ObjectID" {
 			field.DataType = "ObjectID"
 			s.AddField(&field, topLevelField)
 		} else if !fieldType.Implements(modelInterface) && !isRelation(model, fieldStruct) {
 			field.DataType = fieldType.Name()
 			s.AddField(&field, topLevelField)
+
+			// If the slice element is a struct (not a model or relation), traverse its fields
+			if fieldKind == reflect.Struct {
+				// Skip time.Time and MongoDate types
+				switch val.(type) {
+				case time.Time, MongoDate:
+					// Don't traverse these types
+				default:
+					// Recursively initialize fields of the slice element
+					s.InitFields(&fieldValue, field.JsonName, field.BsonName)
+				}
+			}
 		}
 	default:
 		field.DataType = field.IndirectFieldType.Name()
