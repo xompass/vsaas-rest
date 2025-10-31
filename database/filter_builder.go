@@ -344,19 +344,6 @@ func (b *FilterBuilder) MergeWith(other *FilterBuilder, config ...*MergeConfig) 
 	return result
 }
 
-// MergeWithOr combines this FilterBuilder with another using OR operator
-// This is a convenience method for MergeWith with OR configuration
-func (b *FilterBuilder) MergeWithOr(other *FilterBuilder) *FilterBuilder {
-	config := &MergeConfig{WhereOperator: "or"}
-	return b.MergeWith(other, config)
-}
-
-// MergeWithConfig combines this FilterBuilder with another using the provided configuration
-// This is an alias for MergeWith for better readability when using config
-func (b *FilterBuilder) MergeWithConfig(other *FilterBuilder, config *MergeConfig) *FilterBuilder {
-	return b.MergeWith(other, config)
-}
-
 /************************
  * Where Builder
  ************************/
