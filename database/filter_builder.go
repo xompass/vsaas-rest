@@ -197,6 +197,166 @@ func (f *FilterBuilder) ToJSON() (string, error) {
 	return string(data), nil
 }
 
+// MergeConfig defines options for merging FilterBuilders
+type MergeConfig struct {
+	// WhereOperator defines how to combine WHERE conditions: "and" (default) or "or"
+	WhereOperator string
+	// AllowFieldConflicts allows the other FilterBuilder to overwrite field projections
+	AllowFieldConflicts bool
+	// MaxLimit sets a maximum value for the limit when merging
+	MaxLimit *uint
+}
+
+// MergeWith combines this FilterBuilder with another FilterBuilder
+// Returns a new FilterBuilder with merged conditions
+func (b *FilterBuilder) MergeWith(other *FilterBuilder, config ...*MergeConfig) *FilterBuilder {
+	if b == nil {
+		if other == nil {
+			return NewFilter()
+		}
+		return other.Clone()
+	}
+	if other == nil {
+		return b.Clone()
+	}
+
+	// Check for errors in both FilterBuilders
+	if b.err != nil {
+		return &FilterBuilder{err: b.err}
+	}
+	if other.err != nil {
+		return &FilterBuilder{err: other.err}
+	}
+
+	// Get merge configuration
+	var mergeConfig *MergeConfig
+	if len(config) > 0 && config[0] != nil {
+		mergeConfig = config[0]
+	} else {
+		mergeConfig = &MergeConfig{
+			WhereOperator:       "and",
+			AllowFieldConflicts: false,
+		}
+	}
+
+	// Start with a clone of the first FilterBuilder
+	result := b.Clone()
+
+	// Merge WHERE conditions
+	if len(other.where) > 0 {
+		if len(result.where) == 0 {
+			result.where = make([]lbq.Where, len(other.where))
+			copy(result.where, other.where)
+		} else {
+			// Combine existing WHERE with new WHERE using specified operator
+			var combinedWhere lbq.Where
+
+			// Build current WHERE
+			var currentWhere lbq.Where
+			if len(result.where) == 1 {
+				currentWhere = result.where[0]
+			} else {
+				currentWhere = lbq.Where{
+					"and": lbq.AndOrCondition(result.where),
+				}
+			}
+
+			// Build other WHERE
+			var otherWhere lbq.Where
+			if len(other.where) == 1 {
+				otherWhere = other.where[0]
+			} else {
+				otherWhere = lbq.Where{
+					"and": lbq.AndOrCondition(other.where),
+				}
+			}
+
+			// Combine using specified operator
+			if mergeConfig.WhereOperator == "or" {
+				combinedWhere = lbq.Where{
+					"or": lbq.AndOrCondition{currentWhere, otherWhere},
+				}
+			} else {
+				combinedWhere = lbq.Where{
+					"and": lbq.AndOrCondition{currentWhere, otherWhere},
+				}
+			}
+
+			result.where = []lbq.Where{combinedWhere}
+		}
+	}
+
+	// Merge Fields (projection)
+	if len(other.fields) > 0 {
+		if len(result.fields) == 0 {
+			result.fields = make(lbq.Fields)
+			maps.Copy(result.fields, other.fields)
+		} else {
+			// Check for conflicts if not allowed
+			if !mergeConfig.AllowFieldConflicts {
+				for field, otherValue := range other.fields {
+					if currentValue, exists := result.fields[field]; exists && currentValue != otherValue {
+						result.err = errors.Errorf("field projection conflict for '%s': current=%v, other=%v", field, currentValue, otherValue)
+						return result
+					}
+				}
+			}
+
+			// Merge fields (other overwrites current if conflicts are allowed)
+			maps.Copy(result.fields, other.fields)
+		}
+
+		// Validate the merged fields projection
+		if !isValidProjection(result.fields) {
+			result.err = errors.New(FILTER_CANNOT_MIX_INCLUSION_EXCLUSION)
+			return result
+		}
+	}
+
+	// Merge Limit
+	if other.limit != nil {
+		if mergeConfig.MaxLimit != nil && *other.limit > *mergeConfig.MaxLimit {
+			maxLimit := *mergeConfig.MaxLimit
+			result.limit = &maxLimit
+		} else {
+			limit := *other.limit
+			result.limit = &limit
+		}
+	}
+
+	// Merge Skip (other overwrites current)
+	if other.skip != nil {
+		skip := *other.skip
+		result.skip = &skip
+	}
+
+	// Merge Order (other overwrites current)
+	if len(other.order) > 0 {
+		result.order = make([]lbq.Order, len(other.order))
+		copy(result.order, other.order)
+	}
+
+	// Merge Include (concatenate)
+	if len(other.include) > 0 {
+		result.include = append(result.include, other.include...)
+	}
+
+	return result
+}
+
+// MergeWithOr combines this FilterBuilder with another using OR operator
+// This is a convenience method for MergeWith with OR configuration
+func (b *FilterBuilder) MergeWithOr(other *FilterBuilder) *FilterBuilder {
+	config := &MergeConfig{WhereOperator: "or"}
+	return b.MergeWith(other, config)
+}
+
+// MergeWithConfig combines this FilterBuilder with another using the provided configuration
+// This is an alias for MergeWith for better readability when using config
+func (b *FilterBuilder) MergeWithConfig(other *FilterBuilder, config *MergeConfig) *FilterBuilder {
+	return b.MergeWith(other, config)
+}
+
 /************************
  * Where Builder
  ************************/
@@ -211,6 +371,11 @@ func NewWhere() *WhereBuilder {
 }
 
 func (b *WhereBuilder) Eq(field string, value any, strict ...bool) *WhereBuilder {
+	if err := validateField(field); err != nil {
+		b.err = err
+		return b
+	}
+
 	if len(strict) > 0 && strict[0] {
 		return b.Raw(lbq.Where{field: lbq.Where{"eq": value}})
 	}
@@ -219,6 +384,10 @@ func (b *WhereBuilder) Eq(field string, value any, strict ...bool) *WhereBuilder
 }
 
 func (b *WhereBuilder) Neq(field string, value any) *WhereBuilder {
+	if err := validateField(field); err != nil {
+		b.err = err
+		return b
+	}
 	return b.Raw(lbq.Where{field: lbq.Where{"neq": value}})
 }
 
@@ -288,6 +457,11 @@ func (b *WhereBuilder) Gte(field string, value any) *WhereBuilder {
 }
 
 func (b *WhereBuilder) Like(field string, pattern string, options ...string) *WhereBuilder {
+	if err := validateField(field); err != nil {
+		b.err = err
+		return b
+	}
+
 	where := lbq.Where{"like": pattern}
 	if len(options) > 0 {
 		where["options"] = options[0]
@@ -297,10 +471,18 @@ func (b *WhereBuilder) Like(field string, pattern string, options ...string) *Wh
 }
 
 func (b *WhereBuilder) IsNull(field string) *WhereBuilder {
+	if err := validateField(field); err != nil {
+		b.err = err
+		return b
+	}
 	return b.Raw(lbq.Where{field: lbq.Where{"eq": nil}})
 }
 
 func (b *WhereBuilder) IsNotNull(field string) *WhereBuilder {
+	if err := validateField(field); err != nil {
+		b.err = err
+		return b
+	}
 	return b.Raw(lbq.Where{field: lbq.Where{"neq": nil}})
 }
 
@@ -407,8 +589,13 @@ func validateFieldAndValue(field string, value any) error {
 	if strings.TrimSpace(field) == "" {
 		return errors.New(FILTER_FIELD_EMPTY)
 	}
-	if value == nil {
-		return errors.New(FILTER_VALUE_CANNOT_BE_NIL)
+	// Note: value can be nil for cases like {"deleted": null}
+	return nil
+}
+
+func validateField(field string) error {
+	if strings.TrimSpace(field) == "" {
+		return errors.New(FILTER_FIELD_EMPTY)
 	}
 	return nil
 }
