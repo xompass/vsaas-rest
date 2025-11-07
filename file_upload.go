@@ -72,20 +72,21 @@ func NewEchoFileUploadHandler(config *FileUploadConfig) *EchoFileUploadHandler {
 }
 
 // ProcessStreamingFileUploads processes multipart form data using Echo's multipart parsing with size limits
-func (h *EchoFileUploadHandler) ProcessStreamingFileUploads(c echo.Context) (map[string][]*UploadedFile, error) {
+func (h *EchoFileUploadHandler) ProcessStreamingFileUploads(c echo.Context) (map[string][]*UploadedFile, map[string][]string, error) {
 	// Get content type and verify it's multipart
 	contentType := c.Request().Header.Get("Content-Type")
 	if !strings.HasPrefix(contentType, "multipart/form-data") {
-		return nil, echo.NewHTTPError(http.StatusBadRequest, "Content-Type must be multipart/form-data")
+		return nil, nil, echo.NewHTTPError(http.StatusBadRequest, "Content-Type must be multipart/form-data")
 	}
 
 	// Parse the multipart form with custom reader to handle streaming
 	reader, err := c.Request().MultipartReader()
 	if err != nil {
-		return nil, echo.NewHTTPError(http.StatusBadRequest, "Failed to create multipart reader: "+err.Error())
+		return nil, nil, echo.NewHTTPError(http.StatusBadRequest, "Failed to create multipart reader: "+err.Error())
 	}
 
 	uploadedFiles := make(map[string][]*UploadedFile)
+	formValues := make(map[string][]string)
 
 	// Process each part of the multipart form
 	for {
@@ -95,15 +96,33 @@ func (h *EchoFileUploadHandler) ProcessStreamingFileUploads(c echo.Context) (map
 		}
 		if err != nil {
 			h.cleanupFiles(uploadedFiles)
-			return nil, echo.NewHTTPError(http.StatusBadRequest, "Failed to read multipart data: "+err.Error())
+			return nil, nil, echo.NewHTTPError(http.StatusBadRequest, "Failed to read multipart data: "+err.Error())
 		}
 
-		// Skip non-file parts
+		// Check if this is a file or a regular form field
 		if part.FileName() == "" {
+			// This is a regular form field, not a file
+			fieldName := part.FormName()
+			if fieldName != "" {
+				// Read the value
+				valueBytes, readErr := io.ReadAll(part)
+				if readErr != nil {
+					part.Close()
+					h.cleanupFiles(uploadedFiles)
+					return nil, nil, echo.NewHTTPError(http.StatusBadRequest, "Failed to read form field: "+readErr.Error())
+				}
+
+				// Store the form value
+				if formValues[fieldName] == nil {
+					formValues[fieldName] = []string{}
+				}
+				formValues[fieldName] = append(formValues[fieldName], string(valueBytes))
+			}
 			part.Close()
 			continue
 		}
 
+		// This is a file field
 		fieldName := part.FormName()
 		if fieldName == "" {
 			part.Close()
@@ -115,7 +134,7 @@ func (h *EchoFileUploadHandler) ProcessStreamingFileUploads(c echo.Context) (map
 		if err != nil {
 			part.Close()
 			h.cleanupFiles(uploadedFiles)
-			return nil, err
+			return nil, nil, err
 		}
 
 		// Add to results
@@ -130,10 +149,10 @@ func (h *EchoFileUploadHandler) ProcessStreamingFileUploads(c echo.Context) (map
 	// Validate field requirements
 	if err := h.validateFieldRequirements(uploadedFiles); err != nil {
 		h.cleanupFiles(uploadedFiles)
-		return nil, err
+		return nil, nil, err
 	}
 
-	return uploadedFiles, nil
+	return uploadedFiles, formValues, nil
 }
 
 // validateFieldRequirements validates that all required fields are present and limits are respected

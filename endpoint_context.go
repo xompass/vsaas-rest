@@ -18,6 +18,7 @@ type EndpointContext struct {
 	ParsedPath    map[string]any
 	ParsedHeader  map[string]any
 	UploadedFiles map[string][]*UploadedFile
+	FormValues    map[string][]string // Non-file form values from multipart forms
 	IpAddress     string
 	Principal     Principal
 	Token         AuthToken

@@ -396,11 +396,8 @@ func TestParseBody_EdgeCases(t *testing.T) {
 			t.Fatalf("Expected http_errors.ErrorResponse, got %T", err)
 		}
 
-		details, ok := respError.Details.(string)
-		if !ok {
-			t.Fatalf("Expected details to be string, got %T", respError.Details)
-		}
-		assert.Equal(t, details, "Request body cannot be nil")
+		// BadRequestError with only message doesn't set Details field, so check Message instead
+		assert.Equal(t, "Request body cannot be nil", respError.Message)
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {

@@ -83,8 +83,11 @@ func TestEchoFileUploadHandler(t *testing.T) {
 		c := e.NewContext(req, rec)
 
 		// Process upload
-		uploadedFiles, err := handler.ProcessStreamingFileUploads(c)
+		uploadedFiles, formValues, err := handler.ProcessStreamingFileUploads(c)
 		require.NoError(t, err)
+
+		// formValues should be empty since we only uploaded files
+		assert.Empty(t, formValues)
 
 		// Verify results
 		assert.Len(t, uploadedFiles, 2)
@@ -138,7 +141,7 @@ func TestEchoFileUploadHandler(t *testing.T) {
 		c := e.NewContext(req, rec)
 
 		// Process upload - should fail due to size limit
-		_, err = handler.ProcessStreamingFileUploads(c)
+		_, _, err = handler.ProcessStreamingFileUploads(c)
 		require.Error(t, err)
 
 		// Should be a size limit error
@@ -168,7 +171,7 @@ func TestEchoFileUploadHandler(t *testing.T) {
 		c := e.NewContext(req, rec)
 
 		// Process upload - should fail
-		_, err = handler.ProcessStreamingFileUploads(c)
+		_, _, err = handler.ProcessStreamingFileUploads(c)
 		require.Error(t, err)
 
 		// Should be an unsupported media type error
@@ -198,7 +201,7 @@ func TestEchoFileUploadHandler(t *testing.T) {
 		c := e.NewContext(req, rec)
 
 		// Process upload - should fail
-		_, err = handler.ProcessStreamingFileUploads(c)
+		_, _, err = handler.ProcessStreamingFileUploads(c)
 		require.Error(t, err)
 
 		// Should be a bad request error
@@ -237,7 +240,7 @@ func TestEchoFileUploadHandler(t *testing.T) {
 		c := e.NewContext(req, rec)
 
 		// Process upload - should fail
-		_, err = handler.ProcessStreamingFileUploads(c)
+		_, _, err = handler.ProcessStreamingFileUploads(c)
 		require.Error(t, err)
 
 		// Should be a bad request error
@@ -269,7 +272,7 @@ func TestEchoFileUploadHandler(t *testing.T) {
 		c := e.NewContext(req, rec)
 
 		// Process upload
-		uploadedFiles, err := handler.ProcessStreamingFileUploads(c)
+		uploadedFiles, _, err := handler.ProcessStreamingFileUploads(c)
 		require.NoError(t, err)
 
 		avatarFile := uploadedFiles["avatar"][0]

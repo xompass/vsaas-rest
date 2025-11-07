@@ -54,7 +54,13 @@ func parseBody(e *Endpoint, ec *EndpointContext) error {
 		return http_errors.BadRequestError("Request body cannot be nil")
 	}
 
-	if err := ec.EchoCtx.Bind(form); err != nil {
+	// Protect against multipart file uploads when FileUploadConfig is not configured
+	if err := validateMultipartWithoutFileConfig(e, ec); err != nil {
+		return err
+	}
+
+	if err := bindFormToStruct(ec, form); err != nil {
+		log.Println("cannot bind to struct", err)
 		return http_errors.BadRequestError("Failed to bind request body", fmt.Sprintf("Failed to bind request body: %s", err.Error()))
 	}
 
@@ -362,4 +368,54 @@ func getErrorMessage(tag string, kind string, param string) string {
 	default:
 		return ""
 	}
+}
+
+// validateMultipartWithoutFileConfig protects against file uploads when FileUploadConfig is not configured
+// This prevents large files from being loaded into memory during body parsing
+func validateMultipartWithoutFileConfig(e *Endpoint, ec *EndpointContext) error {
+	contentType := ec.EchoCtx.Request().Header.Get("Content-Type")
+
+	// Only check multipart requests
+	if !strings.HasPrefix(contentType, "multipart/form-data") {
+		return nil
+	}
+
+	// If FileUploadConfig is configured, files are handled separately - no validation needed
+	if e.FileUploadConfig != nil {
+		return nil
+	}
+
+	// For multipart requests without FileUploadConfig, we need to peek into the request
+	// to see if it contains files without consuming the entire body
+
+	// Parse the multipart form with a small memory limit to detect files
+	// This will fail if there are large files, protecting us from memory exhaustion
+	request := ec.EchoCtx.Request()
+
+	// Set a reasonable limit for form parsing when no file upload is configured
+	// This allows for small form data but prevents large file uploads
+	const maxMemoryForFormData = 1 << 20 // 1MB limit for form data without file config
+
+	err := request.ParseMultipartForm(maxMemoryForFormData)
+	if err != nil {
+		// If parsing fails due to size limits, it's likely a file upload attempt
+		if strings.Contains(err.Error(), "multipart: message too large") ||
+			strings.Contains(err.Error(), "request body too large") {
+			return http_errors.BadRequestErrorWithCode("FILE_UPLOAD_NOT_CONFIGURED",
+				"This endpoint does not support file uploads. Use JSON body instead, or contact support if file uploads are needed.")
+		}
+		return http_errors.BadRequestError("Invalid multipart form data", err.Error())
+	}
+
+	// Check if the multipart form contains any file fields
+	if request.MultipartForm != nil && request.MultipartForm.File != nil {
+		for fieldName, files := range request.MultipartForm.File {
+			if len(files) > 0 {
+				return http_errors.BadRequestErrorWithCode("FILE_UPLOAD_NOT_CONFIGURED",
+					fmt.Sprintf("File upload detected in field '%s', but this endpoint does not support file uploads. Use JSON body instead.", fieldName))
+			}
+		}
+	}
+
+	return nil
 }
