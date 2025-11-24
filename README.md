@@ -5,6 +5,7 @@ VSAAS REST Framework is a web framework built on Echo v4 for building REST APIs 
 ## Main Features
 
 - High-performance HTTP server (Echo v4)
+- Static file serving with SPA (Single Page Application) support
 - Extensible database connectors (MongoDB supported)
 - Database-agnostic index management with automatic comparison and warnings
 - Role-based authentication and authorization
@@ -15,6 +16,7 @@ VSAAS REST Framework is a web framework built on Echo v4 for building REST APIs 
 - LoopBack 3-compatible query filters
 - Per-endpoint timeouts
 - Structured logging (slog)
+- Flexible HTTP header configuration for static files
 
 ## Installation
 
@@ -1256,6 +1258,136 @@ Endpoints can have a configured timeout to prevent long operations from blocking
     Timeout: 30, // 30 seconds
 }
 ```
+
+## Static Files and SPA Support
+
+The framework provides built-in support for serving static files with flexible header configuration and Single Page Application (SPA) mode. This is ideal for serving frontend applications built with React, Vue, Angular, or any other framework.
+
+### Basic Usage
+
+```go
+// Serve static files from ./public directory
+err := app.ServeStatic(rest.StaticConfig{
+    Prefix:    "/",
+    Directory: "./public",
+})
+```
+
+### SPA Mode
+
+Enable SPA mode to handle client-side routing. When enabled, all routes that don't match existing files will fallback to `index.html`:
+
+```go
+err := app.ServeStatic(rest.StaticConfig{
+    Prefix:    "/",
+    Directory: "./dist",
+    EnableSPA: true,
+})
+```
+
+### Header Configuration
+
+Apply different HTTP headers based on file type:
+
+```go
+err := app.ServeStatic(rest.StaticConfig{
+    Prefix:       "/",
+    Directory:    "./dist",
+    EnableSPA:    true,
+
+    // Base security headers for all files
+    Headers:      rest.SecureStaticHeaders(),
+
+    // No-cache for index.html (enables SPA routing)
+    IndexHeaders: rest.SPAIndexHeaders(),
+
+    // Long-term cache for assets (.js, .css, images, fonts)
+    AssetHeaders: rest.CachedAssetHeaders(),
+})
+```
+
+### Predefined Header Functions
+
+- **`SecureStaticHeaders()`** - Base security headers:
+
+  - `X-Frame-Options: SAMEORIGIN`
+  - `X-Content-Type-Options: nosniff`
+  - `Referrer-Policy: strict-origin-when-cross-origin`
+
+- **`SPAIndexHeaders()`** - No-cache headers for SPA:
+
+  - `Cache-Control: no-cache, no-store, must-revalidate`
+  - `Pragma: no-cache`
+  - Plus all secure headers
+
+- **`CachedAssetHeaders()`** - Long-term caching:
+  - `Cache-Control: public, max-age=31536000, immutable`
+  - Plus all secure headers
+
+### Custom Header Matcher
+
+For advanced scenarios, use a custom function to determine headers:
+
+```go
+err := app.ServeStatic(rest.StaticConfig{
+    Prefix:    "/",
+    Directory: "./dist",
+    EnableSPA: true,
+    Headers:   rest.SecureStaticHeaders(),
+    HeaderMatcher: func(requestPath, filePath string) map[string]string {
+        // Special handling for WebAssembly files
+        if strings.HasSuffix(requestPath, ".wasm") {
+            return map[string]string{
+                "Content-Type":  "application/wasm",
+                "Cache-Control": "public, max-age=31536000",
+            }
+        }
+
+        // Return nil to use default behavior (IndexHeaders/AssetHeaders)
+        return nil
+    },
+})
+```
+
+### Complete Example
+
+```go
+package main
+
+import (
+    rest "github.com/xompass/vsaas-rest"
+)
+
+func main() {
+    app := rest.NewRestApp(rest.RestAppOptions{
+        Name: "My SPA App",
+        Port: 8080,
+    })
+
+    // Register API routes
+    apiGroup := app.Group("/api")
+    // ... register your API endpoints here
+
+    // Serve frontend application
+    err := app.ServeStatic(rest.StaticConfig{
+        Prefix:       "/",
+        Directory:    "./frontend/dist",
+        EnableSPA:    true,
+        Headers:      rest.SecureStaticHeaders(),
+        IndexHeaders: rest.SPAIndexHeaders(),
+        AssetHeaders: rest.CachedAssetHeaders(),
+    })
+    if err != nil {
+        panic(err)
+    }
+
+    app.Start()
+}
+```
+
+For a complete working example, see [examples/static-files](examples/static-files).
+
+For full documentation on static file serving, see [STATIC_FILES_README.md](STATIC_FILES_README.md).
 
 ## Logging Configuration
 
