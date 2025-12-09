@@ -210,12 +210,12 @@ func (receiver *RestApp) setupSPAFallback(config StaticConfig) {
 	// Use Echo's HTTPErrorHandler to serve SPA on 404
 	// This way it only triggers when no other route matches
 	originalHandler := receiver.EchoApp.HTTPErrorHandler
-	
+
 	receiver.EchoApp.HTTPErrorHandler = func(err error, c echo.Context) {
 		// Only handle 404 errors for SPA fallback
 		if he, ok := err.(*echo.HTTPError); ok && he.Code == http.StatusNotFound {
 			requestPath := c.Request().URL.Path
-			
+
 			// Skip excluded prefixes (e.g., /api, /swagger)
 			skipSPA := false
 			for _, prefix := range config.ExcludePrefixes {
@@ -224,7 +224,7 @@ func (receiver *RestApp) setupSPAFallback(config StaticConfig) {
 					break
 				}
 			}
-			
+
 			if !skipSPA {
 				// Check if the requested path is a file that exists
 				filePath := filepath.Join(config.Directory, strings.TrimPrefix(requestPath, config.Prefix))
@@ -253,7 +253,7 @@ func (receiver *RestApp) setupSPAFallback(config StaticConfig) {
 				}
 			}
 		}
-		
+
 		// For all other errors or if SPA fallback failed, use original handler
 		originalHandler(err, c)
 	}
