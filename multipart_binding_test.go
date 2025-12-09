@@ -13,11 +13,11 @@ import (
 
 // Test struct similar to UploadStepFileRequest
 type TestUploadRequest struct {
-	Description string                 `json:"description,omitempty" validate:"omitempty,max=500"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
-	Tags        []string               `json:"tags,omitempty"`
-	Count       int                    `json:"count,omitempty"`
-	IsEnabled   bool                   `json:"is_enabled,omitempty"`
+	Description string         `json:"description,omitempty" validate:"omitempty,max=500"`
+	Metadata    map[string]any `json:"metadata,omitempty"`
+	Tags        []string       `json:"tags,omitempty"`
+	Count       int            `json:"count,omitempty"`
+	IsEnabled   bool           `json:"is_enabled,omitempty"`
 }
 
 func TestBindFormToStruct_MultipartWithFormData(t *testing.T) {
@@ -199,7 +199,7 @@ func TestBindFormToStruct_ComplexDataTypes(t *testing.T) {
 	assert.Equal(t, float64(123), target.Metadata["key2"]) // JSON numbers become float64
 
 	// Verify nested JSON
-	nested, ok := target.Metadata["nested"].(map[string]interface{})
+	nested, ok := target.Metadata["nested"].(map[string]any)
 	assert.True(t, ok)
 	assert.Equal(t, "subvalue", nested["subkey"])
 

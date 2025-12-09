@@ -15,15 +15,16 @@ type HeaderMatchFunc func(requestPath string, filePath string) map[string]string
 
 // StaticConfig holds the configuration for serving static files
 type StaticConfig struct {
-	Prefix        string            // URL prefix (e.g., "/", "/assets")
-	Directory     string            // Physical directory to serve
-	EnableSPA     bool              // Enable SPA mode (fallback to index.html)
-	IndexFile     string            // Index file name (default: "index.html")
-	EnableBrowse  bool              // Allow directory browsing
-	Headers       map[string]string // Base headers for all files
-	IndexHeaders  map[string]string // Headers specific to index file
-	AssetHeaders  map[string]string // Headers for assets (.js, .css, images, etc.)
-	HeaderMatcher HeaderMatchFunc   // Custom function for header matching (takes priority)
+	Prefix          string            // URL prefix (e.g., "/", "/assets")
+	Directory       string            // Physical directory to serve
+	EnableSPA       bool              // Enable SPA mode (fallback to index.html)
+	IndexFile       string            // Index file name (default: "index.html")
+	EnableBrowse    bool              // Allow directory browsing
+	ExcludePrefixes []string          // Path prefixes to exclude from SPA fallback (e.g., "/api", "/swagger")
+	Headers         map[string]string // Base headers for all files
+	IndexHeaders    map[string]string // Headers specific to index file
+	AssetHeaders    map[string]string // Headers for assets (.js, .css, images, etc.)
+	HeaderMatcher   HeaderMatchFunc   // Custom function for header matching (takes priority)
 }
 
 // SecureStaticHeaders returns secure default headers for static files
@@ -177,12 +178,19 @@ func (receiver *RestApp) ServeStatic(config StaticConfig) error {
 
 	receiver.Infof("Serving static files from %s at %s (SPA: %v)", config.Directory, config.Prefix, config.EnableSPA)
 
-	// Create static file server configuration
+	// If SPA mode is enabled, we handle everything in the catch-all route
+	// to avoid conflicts with other routes (API, Swagger, etc.)
+	if config.EnableSPA {
+		receiver.setupSPAFallback(config)
+		return nil
+	}
+
+	// For non-SPA mode, use Echo's static middleware
 	staticConfig := middleware.StaticConfig{
 		Root:   config.Directory,
 		Index:  config.IndexFile,
 		Browse: config.EnableBrowse,
-		HTML5:  config.EnableSPA, // Enable HTML5 mode for SPA
+		HTML5:  false,
 	}
 
 	// Apply custom middleware for headers
@@ -192,11 +200,6 @@ func (receiver *RestApp) ServeStatic(config StaticConfig) error {
 	receiver.EchoApp.Use(headerMiddleware)
 	receiver.EchoApp.Use(middleware.StaticWithConfig(staticConfig))
 
-	// If SPA mode is enabled, add a fallback handler
-	if config.EnableSPA {
-		receiver.setupSPAFallback(config)
-	}
-
 	return nil
 }
 
@@ -204,24 +207,54 @@ func (receiver *RestApp) ServeStatic(config StaticConfig) error {
 func (receiver *RestApp) setupSPAFallback(config StaticConfig) {
 	indexPath := filepath.Join(config.Directory, config.IndexFile)
 
-	// Add a catch-all route at the end that serves index.html
-	receiver.EchoApp.GET("/*", func(c echo.Context) error {
-		// Check if the requested path is a file that exists
-		requestPath := c.Request().URL.Path
-		filePath := filepath.Join(config.Directory, strings.TrimPrefix(requestPath, config.Prefix))
+	// Use Echo's HTTPErrorHandler to serve SPA on 404
+	// This way it only triggers when no other route matches
+	originalHandler := receiver.EchoApp.HTTPErrorHandler
+	
+	receiver.EchoApp.HTTPErrorHandler = func(err error, c echo.Context) {
+		// Only handle 404 errors for SPA fallback
+		if he, ok := err.(*echo.HTTPError); ok && he.Code == http.StatusNotFound {
+			requestPath := c.Request().URL.Path
+			
+			// Skip excluded prefixes (e.g., /api, /swagger)
+			skipSPA := false
+			for _, prefix := range config.ExcludePrefixes {
+				if strings.HasPrefix(requestPath, prefix) {
+					skipSPA = true
+					break
+				}
+			}
+			
+			if !skipSPA {
+				// Check if the requested path is a file that exists
+				filePath := filepath.Join(config.Directory, strings.TrimPrefix(requestPath, config.Prefix))
 
-		// If file exists, let the static middleware handle it
-		if _, err := os.Stat(filePath); err == nil {
-			return c.File(filePath)
+				// If file exists, serve it with appropriate headers
+				if fileInfo, err := os.Stat(filePath); err == nil && !fileInfo.IsDir() {
+					// Get headers for this file
+					headers := config.getHeadersForFile(requestPath, filePath)
+					for key, value := range headers {
+						c.Response().Header().Set(key, value)
+					}
+					if err := c.File(filePath); err == nil {
+						return // Successfully served file
+					}
+				}
+
+				// Otherwise, serve index.html for SPA routing
+				// Apply index headers
+				headers := config.getHeadersForFile(config.IndexFile, indexPath)
+				for key, value := range headers {
+					c.Response().Header().Set(key, value)
+				}
+
+				if err := c.File(indexPath); err == nil {
+					return // Successfully served index.html
+				}
+			}
 		}
-
-		// Otherwise, serve index.html for SPA routing
-		// Apply index headers
-		headers := config.getHeadersForFile(config.IndexFile, indexPath)
-		for key, value := range headers {
-			c.Response().Header().Set(key, value)
-		}
-
-		return c.File(indexPath)
-	})
+		
+		// For all other errors or if SPA fallback failed, use original handler
+		originalHandler(err, c)
+	}
 }
