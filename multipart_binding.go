@@ -145,7 +145,7 @@ func setAdvancedFieldValue(field reflect.Value, fieldType reflect.StructField, v
 		return setJSONValue(field, value)
 
 	case reflect.Interface:
-		// For interface{} types, try to parse as JSON first, fallback to string
+		// For any types, try to parse as JSON first, fallback to string
 		return setInterfaceValue(field, value)
 
 	case reflect.Ptr:
@@ -225,14 +225,14 @@ func setJSONValue(field reflect.Value, value string) error {
 	return nil
 }
 
-// setInterfaceValue handles interface{} types with smart type detection
+// setInterfaceValue handles any types with smart type detection
 func setInterfaceValue(field reflect.Value, value string) error {
 	if value == "" {
 		return nil
 	}
 
 	// Try to parse as JSON first (for complex types)
-	var jsonVal interface{}
+	var jsonVal any
 	if err := sonic.Unmarshal([]byte(value), &jsonVal); err == nil {
 		field.Set(reflect.ValueOf(jsonVal))
 		return nil

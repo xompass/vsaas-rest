@@ -2,9 +2,11 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/go-errors/errors"
 	"github.com/xompass/vsaas-rest/lbq"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -45,9 +47,25 @@ func (repository *MongoRepository[T]) prepareUpdateDocument(update any, updateDe
 		set, ok := document[SET]
 		newUpdate = document
 		if ok {
-			bsonSet, ok = set.(bson.M)
-			if !ok {
-				return nil, errors.New("invalid $set value")
+			switch set := set.(type) {
+			case bson.M:
+				bsonSet = set
+			case bson.D:
+				// Transform to bson.M
+				bsonSet = bson.M{}
+				for _, elem := range set {
+					bsonSet[elem.Key] = elem.Value
+				}
+			default:
+				_json, err := sonic.Marshal(set)
+				if err != nil {
+					return nil, errors.New(fmt.Sprintf("invalid $set value: %T", set))
+				}
+
+				err = sonic.Unmarshal(_json, &bsonSet)
+				if err != nil {
+					return nil, errors.New(fmt.Sprintf("invalid $set value: %T", set))
+				}
 			}
 		} else {
 			bsonSet = bson.M{}
@@ -185,6 +203,14 @@ func getSoftDeleteQuery(query bson.M) bson.M {
 }
 
 func toBsonMap(v any) (doc bson.M, err error) {
+	if v == nil {
+		return bson.M{}, nil
+	}
+
+	if bsonMap, ok := v.(bson.M); ok {
+		return bsonMap, nil
+	}
+
 	data, err := bson.Marshal(v)
 	if err != nil {
 		return

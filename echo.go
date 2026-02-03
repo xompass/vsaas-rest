@@ -115,7 +115,7 @@ func NewEchoApp(config ...EchoAppConfig) *echo.Echo {
 		if e, ok := err.(*errors.Error); ok {
 			log.Printf("Unhandled error: %s\n%s", e.Error(), e.ErrorStack())
 		} else {
-			log.Printf("Unhandled error: %s", err.Error())
+			log.Printf("Unhandled error: %s: %s", err.Error(), c.Request().RequestURI)
 		}
 
 		statusCode := http.StatusInternalServerError

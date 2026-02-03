@@ -45,7 +45,7 @@ type IndexManager interface {
 type IndexWarning struct {
 	Type    IndexWarningType
 	Message string
-	Details map[string]interface{}
+	Details map[string]any
 }
 
 type IndexWarningType string

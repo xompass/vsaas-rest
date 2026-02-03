@@ -15,9 +15,9 @@ import (
 func TestRealWorldUploadScenario(t *testing.T) {
 	// Test struct that mirrors UploadStepFileRequest
 	type UploadStepFileRequest struct {
-		Description string                 `json:"description,omitempty" validate:"omitempty,max=500"`
-		Metadata    map[string]interface{} `json:"metadata,omitempty"`
-		Settings    []string               `json:"settings,omitempty"`
+		Description string         `json:"description,omitempty" validate:"omitempty,max=500"`
+		Metadata    map[string]any `json:"metadata,omitempty"`
+		Settings    []string       `json:"settings,omitempty"`
 	}
 
 	// Create multipart form data similar to real usage
@@ -127,19 +127,19 @@ func TestRealWorldUploadScenario(t *testing.T) {
 	assert.Equal(t, float64(3), target.Metadata["severity"]) // JSON numbers become float64
 
 	// Verify nested JSON objects
-	location, ok := target.Metadata["location"].(map[string]interface{})
+	location, ok := target.Metadata["location"].(map[string]any)
 	assert.True(t, ok)
 	assert.Equal(t, float64(40.7128), location["latitude"])
 	assert.Equal(t, float64(-74.0060), location["longitude"])
 	assert.Equal(t, "123 Main St, New York", location["address"])
 
-	officer, ok := target.Metadata["officer"].(map[string]interface{})
+	officer, ok := target.Metadata["officer"].(map[string]any)
 	assert.True(t, ok)
 	assert.Equal(t, "OFF-001", officer["id"])
 	assert.Equal(t, "John Doe", officer["name"])
 
 	// Verify JSON arrays
-	tags, ok := target.Metadata["tags"].([]interface{})
+	tags, ok := target.Metadata["tags"].([]any)
 	assert.True(t, ok)
 	assert.Len(t, tags, 3)
 	assert.Contains(t, tags, "evidence")
@@ -153,8 +153,8 @@ func TestRealWorldUploadScenario(t *testing.T) {
 // TestErrorCasesInRealWorld tests edge cases that might occur in production
 func TestErrorCasesInRealWorld(t *testing.T) {
 	type TestRequest struct {
-		InvalidJSON map[string]interface{} `json:"invalid_json,omitempty"`
-		ValidField  string                 `json:"valid_field,omitempty"`
+		InvalidJSON map[string]any `json:"invalid_json,omitempty"`
+		ValidField  string         `json:"valid_field,omitempty"`
 	}
 
 	tests := []struct {

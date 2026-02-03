@@ -47,10 +47,22 @@ func (m *MongoIndexManager) EnsureIndexes(model IModel) error {
 	warnings, err := m.CompareIndexes(model)
 	if err != nil {
 		log.Printf("Warning: Could not compare indexes for %s: %v", model.GetModelName(), err)
-	} else if len(warnings) > 0 {
-		log.Printf("Index warnings for %s:", model.GetModelName())
+	}
+
+	// Only log if there are new indexes or differences
+	hasNewIndexes := false
+	hasDifferences := false
+	if len(warnings) > 0 {
 		for _, warning := range warnings {
-			log.Printf("  [%s] %s", warning.Type, warning.Message)
+			switch warning.Type {
+			case IndexWarningMissingInDB:
+				hasNewIndexes = true
+				log.Printf("[%s] New index for %s: %s", warning.Type, model.GetModelName(), warning.Message)
+			case IndexWarningDifferent:
+				hasDifferences = true
+				log.Printf("[%s] Index difference for %s: %s", warning.Type, model.GetModelName(), warning.Message)
+			}
+			// Silently ignore IndexWarningMissingInCode unless there are other changes
 		}
 	}
 
@@ -71,7 +83,11 @@ func (m *MongoIndexManager) EnsureIndexes(model IModel) error {
 		return errors.Errorf("failed to create indexes for %s: %v", model.GetModelName(), err)
 	}
 
-	log.Printf("Successfully ensured %d indexes for %s: %v", len(names), model.GetModelName(), names)
+	// Only log success if there were new indexes or differences
+	if hasNewIndexes || hasDifferences {
+		log.Printf("Successfully ensured %d indexes for %s: %v", len(names), model.GetModelName(), names)
+	}
+
 	return nil
 }
 
@@ -157,7 +173,7 @@ func (m *MongoIndexManager) CompareIndexes(model IModel) ([]IndexWarning, error)
 			warnings = append(warnings, IndexWarning{
 				Type:    IndexWarningMissingInCode,
 				Message: fmt.Sprintf("Index '%s' exists in database but is not defined in code", name),
-				Details: map[string]interface{}{
+				Details: map[string]any{
 					"indexName": name,
 					"dbIndex":   dbIndex,
 				},
@@ -171,7 +187,7 @@ func (m *MongoIndexManager) CompareIndexes(model IModel) ([]IndexWarning, error)
 			warnings = append(warnings, IndexWarning{
 				Type:    IndexWarningMissingInDB,
 				Message: fmt.Sprintf("Index '%s' is defined in code but does not exist in database", idx.Name),
-				Details: map[string]interface{}{
+				Details: map[string]any{
 					"indexName":  idx.Name,
 					"definition": idx,
 				},
@@ -183,7 +199,7 @@ func (m *MongoIndexManager) CompareIndexes(model IModel) ([]IndexWarning, error)
 				warnings = append(warnings, IndexWarning{
 					Type:    IndexWarningDifferent,
 					Message: fmt.Sprintf("Index '%s' differs: %s", idx.Name, diff),
-					Details: map[string]interface{}{
+					Details: map[string]any{
 						"indexName":  idx.Name,
 						"difference": diff,
 						"defined":    idx,
