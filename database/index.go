@@ -4,6 +4,9 @@ package database
 type IndexField struct {
 	Name  string // Field name
 	Order int    // 1 for ascending, -1 for descending
+	// Type is a special index type for the field (text, 2dsphere, hashed...): when set, it is the
+	// field's key instead of Order.
+	Type MongoIndexType
 }
 
 // IndexDefinition is a generic, database-agnostic representation of an index

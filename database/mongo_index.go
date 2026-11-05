@@ -50,6 +50,14 @@ const (
 	MongoIndexTypeWildcard MongoIndexType = "wildcard" // Wildcard index
 )
 
+// key is the field's value in the index keys document: its special type, or its order.
+func (f IndexField) key() any {
+	if f.Type != "" {
+		return string(f.Type)
+	}
+	return f.Order
+}
+
 // Helper constructors for common MongoDB index types
 
 // NewMongoSimpleIndex creates a simple ascending index on a single field
@@ -80,7 +88,7 @@ func NewMongoCompoundIndex(name string, fields []IndexField, unique bool) MongoI
 func NewMongoTextIndex(name string, fields []string) MongoIndexDefinition {
 	indexFields := make([]IndexField, len(fields))
 	for i, field := range fields {
-		indexFields[i] = IndexField{Name: field, Order: 1} // text indexes use special "text" order in MongoDB
+		indexFields[i] = IndexField{Name: field, Type: MongoIndexTypeText}
 	}
 
 	return MongoIndexDefinition{
@@ -123,7 +131,7 @@ func NewMongo2DSphereIndex(fieldName string) MongoIndexDefinition {
 	return MongoIndexDefinition{
 		IndexDefinition: IndexDefinition{
 			Name:   fieldName + "_2dsphere",
-			Fields: []IndexField{{Name: fieldName, Order: 1}},
+			Fields: []IndexField{{Name: fieldName, Type: MongoIndexType2DSphere}},
 		},
 	}
 }
@@ -133,7 +141,7 @@ func NewMongoHashedIndex(fieldName string) MongoIndexDefinition {
 	return MongoIndexDefinition{
 		IndexDefinition: IndexDefinition{
 			Name:   fieldName + "_hashed",
-			Fields: []IndexField{{Name: fieldName, Order: 1}},
+			Fields: []IndexField{{Name: fieldName, Type: MongoIndexTypeHashed}},
 		},
 	}
 }

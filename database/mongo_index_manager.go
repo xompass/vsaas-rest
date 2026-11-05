@@ -2,8 +2,10 @@ package database
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"log"
+	"maps"
 	"sort"
 	"strings"
 
@@ -52,42 +54,55 @@ func (m *MongoIndexManager) EnsureIndexes(model IModel) error {
 	// Only log if there are new indexes or differences
 	hasNewIndexes := false
 	hasDifferences := false
-	if len(warnings) > 0 {
-		for _, warning := range warnings {
-			switch warning.Type {
-			case IndexWarningMissingInDB:
-				hasNewIndexes = true
-				log.Printf("[%s] New index for %s: %s", warning.Type, model.GetModelName(), warning.Message)
-			case IndexWarningDifferent:
-				hasDifferences = true
-				log.Printf("[%s] Index difference for %s: %s", warning.Type, model.GetModelName(), warning.Message)
+	// The indexes whose keys changed in code: MongoDB refuses another index with the same name,
+	// so they are dropped and created again.
+	recreate := map[string]bool{}
+	for _, warning := range warnings {
+		switch warning.Type {
+		case IndexWarningMissingInDB:
+			hasNewIndexes = true
+			log.Printf("[%s] New index for %s: %s", warning.Type, model.GetModelName(), warning.Message)
+		case IndexWarningDifferent:
+			hasDifferences = true
+			log.Printf("[%s] Index difference for %s: %s", warning.Type, model.GetModelName(), warning.Message)
+			if warning.Details["keysDiffer"] == true {
+				recreate[warning.Details["indexName"].(string)] = true
 			}
-			// Silently ignore IndexWarningMissingInCode unless there are other changes
 		}
+		// Silently ignore IndexWarningMissingInCode unless there are other changes
 	}
 
-	// Create index models
-	indexModels := make([]mongo.IndexModel, 0, len(indexes))
+	// One by one: an index that cannot be created (its data does not fit it) does not stop the rest.
+	var names []string
+	var errs []error
 	for _, idx := range indexes {
 		indexModel, err := m.convertToMongoIndexModel(idx)
 		if err != nil {
-			return errors.Errorf("failed to convert index %s: %v", idx.Name, err)
+			errs = append(errs, errors.Errorf("failed to convert index %s: %v", idx.Name, err))
+			continue
 		}
-		indexModels = append(indexModels, indexModel)
-	}
-
-	// Create indexes
-	opts := options.CreateIndexes()
-	names, err := collection.Indexes().CreateMany(m.ctx, indexModels, opts)
-	if err != nil {
-		return errors.Errorf("failed to create indexes for %s: %v", model.GetModelName(), err)
+		if recreate[idx.Name] {
+			if err := collection.Indexes().DropOne(m.ctx, idx.Name); err != nil {
+				errs = append(errs, errors.Errorf("failed to drop index %s to recreate it: %v", idx.Name, err))
+				continue
+			}
+			log.Printf("Recreating index %s of %s with its new keys", idx.Name, model.GetModelName())
+		}
+		name, err := collection.Indexes().CreateOne(m.ctx, indexModel)
+		if err != nil {
+			errs = append(errs, errors.Errorf("failed to create index %s: %v", idx.Name, err))
+			continue
+		}
+		names = append(names, name)
 	}
 
 	// Only log success if there were new indexes or differences
 	if hasNewIndexes || hasDifferences {
 		log.Printf("Successfully ensured %d indexes for %s: %v", len(names), model.GetModelName(), names)
 	}
-
+	if len(errs) > 0 {
+		return errors.Errorf("failed to create indexes for %s: %v", model.GetModelName(), stderrors.Join(errs...))
+	}
 	return nil
 }
 
@@ -202,6 +217,7 @@ func (m *MongoIndexManager) CompareIndexes(model IModel) ([]IndexWarning, error)
 					Details: map[string]any{
 						"indexName":  idx.Name,
 						"difference": diff,
+						"keysDiffer": keysDiffer(idx, dbIndex),
 						"defined":    idx,
 						"existing":   dbIndex,
 					},
@@ -225,7 +241,7 @@ func (m *MongoIndexManager) convertToMongoIndexModel(idx MongoIndexDefinition) (
 	// Build keys document
 	keys := bson.D{}
 	for _, field := range idx.Fields {
-		keys = append(keys, bson.E{Key: field.Name, Value: field.Order})
+		keys = append(keys, bson.E{Key: field.Name, Value: field.key()})
 	}
 
 	// Build options
@@ -324,40 +340,8 @@ func (m *MongoIndexManager) convertToMongoIndexModel(idx MongoIndexDefinition) (
 func (m *MongoIndexManager) compareIndexDetails(defined MongoIndexDefinition, existing bson.M) string {
 	var differences []string
 
-	// Compare keys (fields)
-	if existingKeys, ok := existing["key"].(bson.M); ok {
-		definedKeys := make(map[string]int)
-		for _, field := range defined.Fields {
-			definedKeys[field.Name] = field.Order
-		}
-
-		// Check if keys match
-		if len(existingKeys) != len(definedKeys) {
-			differences = append(differences, "different number of fields")
-		} else {
-			for key, val := range existingKeys {
-				var order int
-				switch v := val.(type) {
-				case int:
-					order = v
-				case int32:
-					order = int(v)
-				case int64:
-					order = int(v)
-				case float64:
-					order = int(v)
-				case string:
-					// For text indexes, the value is "text"
-					if v == "text" {
-						order = 1 // We use 1 as convention for text fields
-					}
-				}
-
-				if definedOrder, exists := definedKeys[key]; !exists || definedOrder != order {
-					differences = append(differences, fmt.Sprintf("field '%s' order mismatch", key))
-				}
-			}
-		}
+	if keysDiffer(defined, existing) {
+		differences = append(differences, "keys differ")
 	}
 
 	// Compare unique constraint
@@ -389,4 +373,53 @@ func (m *MongoIndexManager) compareIndexDetails(defined MongoIndexDefinition, ex
 
 	sort.Strings(differences)
 	return strings.Join(differences, ", ")
+}
+
+// indexKeys is the keys document MongoDB keeps for the defined index: the fields of a text index
+// become "_fts"/"_ftsx" (its weights list them), the rest stay as they are.
+func indexKeys(fields []IndexField) map[string]any {
+	keys := make(map[string]any, len(fields))
+	for _, field := range fields {
+		if field.Type == MongoIndexTypeText {
+			keys["_fts"], keys["_ftsx"] = string(MongoIndexTypeText), 1
+			continue
+		}
+		keys[field.Name] = field.key()
+	}
+	return keys
+}
+
+// storedKeys is the keys document of an existing index, its numbers as int.
+func storedKeys(existing bson.M) (map[string]any, bool) {
+	keys := map[string]any{}
+	add := func(key string, value any) {
+		switch number := value.(type) {
+		case int32:
+			value = int(number)
+		case int64:
+			value = int(number)
+		case float64:
+			value = int(number)
+		}
+		keys[key] = value
+	}
+	switch document := existing["key"].(type) {
+	case bson.M:
+		for key, value := range document {
+			add(key, value)
+		}
+	case bson.D:
+		for _, element := range document {
+			add(element.Key, element.Value)
+		}
+	default:
+		return nil, false
+	}
+	return keys, true
+}
+
+// keysDiffer reports whether the existing index has other keys (fields or types) than the defined one.
+func keysDiffer(defined MongoIndexDefinition, existing bson.M) bool {
+	stored, ok := storedKeys(existing)
+	return ok && !maps.Equal(stored, indexKeys(defined.Fields))
 }
