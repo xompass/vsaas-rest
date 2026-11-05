@@ -319,7 +319,8 @@ func buildWhere(where lbq.Where, parentField string, fields map[string]*Field) (
 func getObjectIdArray(val any) ([]bson.ObjectID, error) {
 	rv := reflect.ValueOf(val)
 	if rv.Kind() == reflect.Slice {
-		var arr []bson.ObjectID
+		// Never nil: an empty list must stay [] (matches nothing); Mongo refuses $in: null.
+		arr := make([]bson.ObjectID, 0, rv.Len())
 		var valErr error
 		for i := 0; i < rv.Len(); i++ {
 			el := rv.Index(i).Interface()
@@ -375,7 +376,7 @@ func getDateArray(val any) ([]time.Time, error) {
 		return nil, http_errors.BadRequestErrorWithCode(INVALID_DATE_COLLECTION, "invalid date collection")
 	}
 
-	var arr []time.Time
+	arr := make([]time.Time, 0, len(valArr)) // Never nil, as in getObjectIdArray
 	var valErr error
 	for _, s := range valArr {
 		_date, err := getDate(s)
