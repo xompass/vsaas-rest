@@ -44,6 +44,25 @@ func (repository *MongoRepository[T]) prepareUpdateDocument(update any, updateDe
 	var bsonSet bson.M
 
 	if hasCommands {
+		// $setOnInsert may come as a model (FindOneOrCreate): turn it into a map, without the fields
+		// the repository manages, which would conflict with the $currentDate/$setOnInsert set below.
+		if value, ok := document[SET_ON_INSERT]; ok {
+			setOnInsert, err := toBsonMap(value)
+			if err != nil {
+				return nil, errors.New(fmt.Sprintf("invalid $setOnInsert value: %v", err))
+			}
+			if repository.Options.Modified {
+				delete(setOnInsert, MODIFIED)
+			}
+			if repository.Options.Created && setCreated.Insert {
+				delete(setOnInsert, CREATED)
+			}
+			if repository.Options.Deleted && setCreated.Insert {
+				delete(setOnInsert, DELETED)
+			}
+			document[SET_ON_INSERT] = setOnInsert
+		}
+
 		set, ok := document[SET]
 		newUpdate = document
 		if ok {

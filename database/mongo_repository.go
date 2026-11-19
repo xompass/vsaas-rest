@@ -328,7 +328,8 @@ func (repository *MongoRepository[T]) Upsert(ctx context.Context, filterBuilder 
 	}
 
 	upsert := true
-	fixedUpdate, err := repository.prepareUpdateDocument(update, UpdateOptions{}, UpdateOptions{})
+	// An upsert may insert: the inserted document gets its created date and soft-delete marker.
+	fixedUpdate, err := repository.prepareUpdateDocument(update, UpdateOptions{}, UpdateOptions{Insert: true})
 	if err != nil {
 		return err
 	}
